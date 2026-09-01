@@ -1,0 +1,163 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+5 0 obj
+<< /Length 4968 >>
+stream
+q 1.000 1.000 1.000 rg 0.0 0.0 595.0 842.0 re f Q
+q 0.180 0.390 0.240 rg 58.0 783.0 479.0 4.0 re f Q
+BT /F2 9.0 Tf 0.180 0.390 0.240 rg 58.0 765.0 Td (EcoDev Code Analyzer) Tj ET
+BT /F3 8.5 Tf 0.340 0.380 0.350 rg 452.0 765.0 Td (Project Synopsis) Tj ET
+q 0.780 0.800 0.780 RG 0.5 w 58.0 753.0 m 537.0 753.0 l S Q
+q 0.780 0.800 0.780 RG 0.5 w 58.0 43.0 m 537.0 43.0 l S Q
+BT /F1 8.5 Tf 0.340 0.380 0.350 rg 58.0 27.0 Td (Vishal | Student ID: 2619064) Tj ET
+BT /F1 8.5 Tf 0.340 0.380 0.350 rg 512.0 27.0 Td (1) Tj ET
+BT /F2 22.0 Tf 0.180 0.390 0.240 rg 254.5 715.0 Td (SYNOPSIS) Tj ET
+BT /F2 11.0 Tf 0.100 0.120 0.110 rg 58.0 673.0 Td (Title of the project:) Tj ET
+BT /F2 12.5 Tf 0.100 0.120 0.110 rg 62.0 654.0 Td (EcoDev: Green Code Analyzer and Laptop Energy Saver) Tj ET
+BT /F2 11.0 Tf 0.100 0.120 0.110 rg 58.0 625.0 Td (Member of the project:) Tj ET
+BT /F1 11.0 Tf 0.100 0.120 0.110 rg 184.0 625.0 Td (Vishal) Tj ET
+BT /F2 11.0 Tf 0.100 0.120 0.110 rg 58.0 606.0 Td (Student ID / Roll no.:) Tj ET
+BT /F1 11.0 Tf 0.100 0.120 0.110 rg 184.0 606.0 Td (2619064) Tj ET
+BT /F2 12.0 Tf 0.180 0.390 0.240 rg 58.0 572.0 Td (Project overview:) Tj ET
+BT /F1 10.5 Tf 0.100 0.120 0.110 rg 58.0 551.0 Td (EcoDev is a local-first software tool that helps developers understand the) Tj ET
+BT /F1 10.5 Tf 0.100 0.120 0.110 rg 58.0 536.0 Td (performance, memory, reliability, scalability, security, and energy) Tj ET
+BT /F1 10.5 Tf 0.100 0.120 0.110 rg 58.0 521.0 Td (implications of their code. It combines code analysis, laptop energy-saving) Tj ET
+BT /F1 10.5 Tf 0.100 0.120 0.110 rg 58.0 506.0 Td (guidance, capacity forecasting, and a clear path toward VS Code and desktop) Tj ET
+BT /F1 10.5 Tf 0.100 0.120 0.110 rg 58.0 491.0 Td (companion integration.) Tj ET
+BT /F2 12.0 Tf 0.180 0.390 0.240 rg 58.0 458.0 Td (Purpose of the project: \(write in points\)) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 434.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 434.0 Td (To identify time complexity and memory usage patterns in JavaScript,) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 420.0 Td (TypeScript, Python, Go, and C programs, then explain practical) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 406.0 Td (alternatives.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 386.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 386.0 Td (To support user-defined priorities such as fastest runtime, limited) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 372.0 Td (memory, reliable and testable code, scalability, security, and) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 358.0 Td (bug-resistant design.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 338.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 338.0 Td (To connect software efficiency with greener computing by reducing) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 324.0 Td (unnecessary CPU work, memory movement, background activity, and) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 310.0 Td (repeated processing.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 290.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 290.0 Td (To forecast laptop and resource usage from recent samples so) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 276.0 Td (developers can spot rising capacity demand before it becomes a) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 262.0 Td (performance or energy problem.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 242.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 242.0 Td (To encourage everyday laptop energy habits such as automatic) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 228.0 Td (screen-off, lower brightness, battery saver, reduced background) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 214.0 Td (applications, and keyboard-backlight control.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 194.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 194.0 Td (To keep analysis local by default, store results in the browser, and) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 180.0 Td (explain privacy limits instead of sending source code to a remote) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 166.0 Td (service.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 146.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 146.0 Td (To provide a clear future integration path for a permission-based) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 132.0 Td (desktop companion and a VS Code extension that can share active-file) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 118.0 Td (and compile-event context locally.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 98.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 98.0 Td (To help engineers choose an optimization by showing tradeoffs among) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 84.0 Td (speed, RAM use, reliability, scalability, security, maintainability,) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 70.0 Td (and energy impact.) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R /F4 4 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 5126 >>
+stream
+q 1.000 1.000 1.000 rg 0.0 0.0 595.0 842.0 re f Q
+q 0.180 0.390 0.240 rg 58.0 783.0 479.0 4.0 re f Q
+BT /F2 9.0 Tf 0.180 0.390 0.240 rg 58.0 765.0 Td (EcoDev Code Analyzer) Tj ET
+BT /F3 8.5 Tf 0.340 0.380 0.350 rg 452.0 765.0 Td (Project Synopsis) Tj ET
+q 0.780 0.800 0.780 RG 0.5 w 58.0 753.0 m 537.0 753.0 l S Q
+q 0.780 0.800 0.780 RG 0.5 w 58.0 43.0 m 537.0 43.0 l S Q
+BT /F1 8.5 Tf 0.340 0.380 0.350 rg 58.0 27.0 Td (Vishal | Student ID: 2619064) Tj ET
+BT /F1 8.5 Tf 0.340 0.380 0.350 rg 512.0 27.0 Td (2) Tj ET
+BT /F2 19.0 Tf 0.180 0.390 0.240 rg 243.5 715.0 Td (PROJECT DETAILS) Tj ET
+BT /F2 12.0 Tf 0.180 0.390 0.240 rg 58.0 675.0 Td (Expected outcomes) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 653.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 653.0 Td (A simple developer-facing interface for comparing code choices with) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 639.0 Td (evidence rather than guesswork.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 619.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 619.0 Td (A more complete view of efficiency that includes code, browser) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 605.0 Td (activity, laptop power habits, and workload forecasts.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 585.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 585.0 Td (Recommendations that are advisory and transparent about confidence;) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 571.0 Td (EcoDev does not claim compiler-grade, security-certified, or bug-free) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 557.0 Td (results.) Tj ET
+BT /F2 11.0 Tf 0.180 0.390 0.240 rg 61.0 537.0 Td (-) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 537.0 Td (A foundation for future local integrations without requiring accounts,) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 76.0 523.0 Td (cloud source-code uploads, or unnecessary data collection.) Tj ET
+BT /F2 12.0 Tf 0.180 0.390 0.240 rg 58.0 493.0 Td (Important implementation note) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 58.0 472.0 Td (A web browser cannot directly enumerate every laptop process, change hardware) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 58.0 457.0 Td (brightness, turn off the operating-system display, or switch the system) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 58.0 442.0 Td (battery mode. EcoDev therefore presents these as clear local recommendations) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 58.0 427.0 Td (and keeps the actual device-control path reserved for an optional desktop) Tj ET
+BT /F1 10.2 Tf 0.100 0.120 0.110 rg 58.0 412.0 Td (companion with explicit user permission.) Tj ET
+BT /F2 12.0 Tf 0.180 0.390 0.240 rg 58.0 379.0 Td (Bibliography / Sources) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 357.0 Td (1.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 357.0 Td (Green Software Foundation. Green Software Principles.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 345.0 Td (https://principles.green/) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 327.0 Td (2.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 327.0 Td (International Energy Agency. Electricity 2024: Data centres and data) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 315.0 Td (transmission networks.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 303.0 Td (https://www.iea.org/reports/electricity-2024/data-centres-and-data-transmission-networks) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 285.0 Td (3.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 285.0 Td (Barroso, L. A., and Hˆlzle, U. The Case for Energy-Proportional) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 273.0 Td (Computing. ACM Queue.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 261.0 Td (https://queue.acm.org/detail.cfm?id=1558374) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 243.0 Td (4.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 243.0 Td (MDN Web Docs. Web Performance: measuring and improving the user) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 231.0 Td (experience.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 219.0 Td (https://developer.mozilla.org/en-US/docs/Web/Performance) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 201.0 Td (5.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 201.0 Td (Microsoft Support. Change the power mode for your Windows PC.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 189.0 Td (https://support.microsoft.com/windows/change-the-power-mode-for-your-windows-pc) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 171.0 Td (6.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 171.0 Td (Visual Studio Code. Extension API documentation.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 159.0 Td (https://code.visualstudio.com/api) Tj ET
+BT /F2 9.5 Tf 0.180 0.390 0.240 rg 58.0 141.0 Td (7.) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 141.0 Td (EcoDev project interface and local heuristic analysis. Prepared for this) Tj ET
+BT /F1 9.2 Tf 0.100 0.120 0.110 rg 73.0 129.0 Td (synopsis from the project prototype and provided reference screenshots.) Tj ET
+BT /F3 8.8 Tf 0.150 0.300 0.480 rg 73.0 117.0 Td (Local project reference; screenshots supplied by the student.) Tj ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 9 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R /F4 4 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
+endobj
+10 0 obj
+<< /Type /Catalog /Pages 9 0 R >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000000238 00000 n 
+0000000306 00000 n 
+0000005326 00000 n 
+0000005482 00000 n 
+0000010660 00000 n 
+0000010816 00000 n 
+0000010879 00000 n 
+trailer
+<< /Size 11 /Root 10 0 R >>
+startxref
+10929
+%%EOF

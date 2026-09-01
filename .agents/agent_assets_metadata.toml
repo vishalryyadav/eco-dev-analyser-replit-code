@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "I6DxHKvLICAm3y7x2hGT0"
+uri = "file://exports/ecodev_synopsis_vishal_2619064.pdf"
+type = "pdf"
+title = "EcoDev Synopsis - Vishal 2619064"
+description = "Two-page A4 project synopsis with purpose points, expected outcomes, laptop energy-saving scope, and bibliography/source URLs."
+logical_id = "fd40da6d-060e-4a9d-986c-4e04a42a6889"
+content_hash = "sha256:61763d2ccc2f7ad67c63403e2946a7122b4ff6afa9b39f7cc234adb01f5b511a"
+size = 11217
+mtime_ms = 1788257495103
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:feb746f0-d4c6-4128-aa9e-e3e405b01986/fd40da6d-060e-4a9d-986c-4e04a42a6889/77cf15c2-e17a-4c54-8e40-f527c3cfe487"
+storage_version_token = "1788257504599039"
+content_type = "application/pdf"
