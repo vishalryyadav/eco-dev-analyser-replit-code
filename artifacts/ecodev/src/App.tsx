@@ -49,6 +49,9 @@ type Analysis = {
   alternative: string;
   tradeoff: string;
   saved: boolean;
+  priority?: string;
+  forecast?: string;
+  confidence?: string;
 };
 
 type MonitorSample = {
@@ -61,6 +64,8 @@ type MonitorSample = {
   status: string;
   capturedAt: string;
 };
+
+type OptimizationGoal = 'balanced' | 'speed' | 'memory' | 'reliability' | 'scale' | 'security';
 
 type ResearchNote = {
   title: string;
@@ -120,7 +125,36 @@ const samples: Record<string, { fileName: string; code: string }> = {
     return result
 }`,
   },
+  c: {
+    fileName: 'unique_items.c',
+    code: `#include <stdbool.h>
+#include <stddef.h>
+
+size_t unique_items(const int *items, size_t count, int *out) {
+    size_t written = 0;
+    for (size_t i = 0; i < count; i++) {
+        bool exists = false;
+        for (size_t j = 0; j < written; j++) {
+            if (out[j] == items[i]) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) out[written++] = items[i];
+    }
+    return written;
+}`,
+  },
 };
+
+const optimizationGoals: { value: OptimizationGoal; label: string; detail: string }[] = [
+  { value: 'balanced', label: 'Balanced', detail: 'Best overall tradeoff' },
+  { value: 'speed', label: 'Fastest', detail: 'Prioritize runtime' },
+  { value: 'memory', label: 'Low memory', detail: 'Reduce RAM pressure' },
+  { value: 'reliability', label: 'Reliable', detail: 'Prefer simple, testable paths' },
+  { value: 'scale', label: 'Scalable', detail: 'Plan for larger workloads' },
+  { value: 'security', label: 'Secure', detail: 'Reduce attack surface' },
+];
 
 const defaultAnalyses: Analysis[] = [
   {
@@ -220,7 +254,7 @@ function Logo() {
 function Shell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(true);
   const links = [
     { href: '/', label: 'Overview', icon: Gauge, test: 'overview' },
     { href: '/analyzer', label: 'Analyzer', icon: Code2, test: 'analyzer' },
@@ -229,9 +263,10 @@ function Shell({ children }: { children: ReactNode }) {
   ];
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('ecodev-theme') === 'dark';
-    setDark(savedTheme);
-    document.documentElement.classList.toggle('dark', savedTheme);
+    const savedTheme = localStorage.getItem('ecodev-theme');
+    const useDark = savedTheme !== 'light';
+    setDark(useDark);
+    document.documentElement.classList.toggle('dark', useDark);
   }, []);
 
   function toggleTheme() {
@@ -292,6 +327,11 @@ function ScoreRing({ score, size = 'large' }: { score: number; size?: 'large' | 
 function Overview() {
   const analyses = getAnalyses();
   const average = Math.round(analyses.reduce((sum, item) => sum + item.score, 0) / analyses.length);
+  const averageCpu = Math.round(monitorSamples.reduce((sum, sample) => sum + sample.cpu, 0) / monitorSamples.length);
+  const forecastLabel = averageCpu > 35 ? 'Watch capacity' : 'Stable capacity';
+  const forecastDetail = averageCpu > 35
+    ? 'Current activity could raise energy use during the next workload spike.'
+    : 'Current activity is leaving healthy headroom for the next workload spike.';
   return <div className="animate-rise-in">
     <PageTitle eyebrow="Workspace overview" title="Make the efficient call." detail="A clear read on your codebase today, with the evidence to choose what happens next." action={<Link href="/analyzer" data-testid="link-run-analysis" className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-[12px] font-bold text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5"><Plus size={15} /> New analysis</Link>} />
     <section className="grid gap-4 md:grid-cols-[1.35fr_1fr_1fr]">
@@ -303,8 +343,13 @@ function Overview() {
       <section className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-6 flex items-center justify-between"><div><h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Recent analyzer activity</h2><p className="mt-1 text-[11px] text-muted-foreground">Your latest evidence, not a leaderboard.</p></div><Link href="/history" data-testid="link-view-history" className="text-[11px] font-bold text-primary hover:underline">View history <ArrowUpRight size={12} className="inline" /></Link></div><div className="space-y-1">{analyses.slice(0, 4).map((item) => <ActivityRow key={item.id} item={item} />)}</div></section>
       <section className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-5 flex items-center justify-between"><div><h2 className="text-[15px] font-extrabold tracking-[-0.03em]">Local monitor</h2><p className="mt-1 text-[11px] text-muted-foreground">Last captured processes</p></div><Link href="/settings" data-testid="link-monitor-settings" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted"><MoreHorizontal size={17} /></Link></div><div className="space-y-4">{monitorSamples.map((sample) => <MonitorRow key={sample.processName} sample={sample} />)}</div><div className="mt-5 border-t border-border pt-4"><Link href="/settings" data-testid="link-monitor-readiness" className="flex items-center gap-2 text-[11px] font-bold text-primary"><ShieldCheck size={14} /> Monitoring readiness <ArrowUpRight size={12} /></Link></div></section>
     </div>
-    <section className="mt-5 rounded-2xl border border-[#cfe6a2] bg-[#f1f7df] p-5 md:p-6"><div className="flex gap-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d9ef9b] text-[#376b42]"><Sparkles size={17} /></span><div><p className="text-[12px] font-extrabold text-[#315b3d]">A useful next move</p><p className="mt-1 max-w-[680px] text-[12px] leading-relaxed text-[#55725c]">Run the analyzer on a hot path before optimizing your next feature. One measured improvement beats a dozen assumptions.</p><Link href="/analyzer" data-testid="link-next-analysis" className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-[#2c7045] hover:underline">Open analyzer <ArrowUpRight size={12} /></Link></div></div></section>
+       <section className="mt-5 rounded-2xl border border-[#cfe6a2] bg-[#f1f7df] p-5 dark:border-[#385c3f] dark:bg-[#1d3825] md:p-6"><div className="flex gap-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d9ef9b] text-[#376b42] dark:bg-[#365c3d] dark:text-[#c6ed51]"><Sparkles size={17} /></span><div><p className="text-[12px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">A useful next move</p><p className="mt-1 max-w-[680px] text-[12px] leading-relaxed text-[#55725c] dark:text-[#a5b9a3]">Run the analyzer on a hot path before optimizing your next feature. One measured improvement beats a dozen assumptions.</p><Link href="/analyzer" data-testid="link-next-analysis" className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-[#2c7045] hover:underline dark:text-[#c6ed51]">Open analyzer <ArrowUpRight size={12} /></Link></div></div></section>
+       <section className="mt-5 rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6" data-testid="card-capacity-forecast"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="mono mb-2 text-[10px] uppercase tracking-[.17em] text-primary">Capacity forecast</div><h2 className="text-[17px] font-extrabold tracking-[-.04em]">{forecastLabel}</h2><p className="mt-1 max-w-[680px] text-[11px] leading-relaxed text-muted-foreground">{forecastDetail}</p></div><span className={`rounded-full px-2.5 py-1 mono text-[9px] uppercase tracking-[.1em] ${averageCpu > 35 ? 'bg-[#4c3920] text-[#efc777]' : 'bg-secondary text-primary'}`} data-testid="status-capacity-forecast">Next 30 min · {averageCpu}% avg CPU</span></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><ForecastStat label="Compute headroom" value={averageCpu > 35 ? '62%' : '78%'} detail="Estimated available" /><ForecastStat label="Energy direction" value={averageCpu > 35 ? 'Rising' : 'Steady'} detail="Based on recent samples" /><ForecastStat label="Next action" value={averageCpu > 35 ? 'Profile' : 'Measure'} detail="Before changing code" /></div></section>
   </div>;
+}
+
+function ForecastStat({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="rounded-xl bg-muted/60 px-4 py-3" data-testid={`forecast-stat-${label.toLowerCase().replaceAll(' ', '-')}`}><p className="text-[10px] font-bold uppercase tracking-[.1em] text-muted-foreground">{label}</p><p className="mt-1 text-[15px] font-extrabold">{value}</p><p className="mt-1 mono text-[9px] text-muted-foreground">{detail}</p></div>;
 }
 
 function MetricCard({ label, value, detail, positive, icon }: { label: string; value: string; detail: string; positive?: boolean; icon: ReactNode }) {
@@ -323,6 +368,8 @@ function Analyzer() {
   const [language, setLanguage] = useState('javascript');
   const [fileName, setFileName] = useState(samples.javascript.fileName);
   const [code, setCode] = useState(starterCode);
+  const [goal, setGoal] = useState<OptimizationGoal>('balanced');
+  const [constraints, setConstraints] = useState('');
   const [result, setResult] = useState<Analysis | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState('');
@@ -344,21 +391,63 @@ function Analyzer() {
     setNotice('');
     setIsRunning(true);
     window.setTimeout(() => {
-      const isEfficient = code.includes('Set') || code.includes('set(') || code.includes('map[');
+      const normalized = code.toLowerCase();
+      const isEfficient = code.includes('Set') || code.includes('set(') || code.includes('map[') || normalized.includes('unordered_map') || normalized.includes('hashmap');
+      const asksForMemory = /(memory|ram|limited|small footprint)/.test(`${goal} ${constraints.toLowerCase()}`);
+      const asksForSecurity = /(security|secure|attack|input validation)/.test(`${goal} ${constraints.toLowerCase()}`);
+      const asksForReliability = /(reliable|reliability|bug[- ]?free|testable)/.test(`${goal} ${constraints.toLowerCase()}`);
+      const asksForScale = /(scale|scalable|large|million|production)/.test(`${goal} ${constraints.toLowerCase()}`);
+      const score = isEfficient ? (asksForMemory ? 90 : 94) : (asksForMemory ? 77 : 82);
+      const languageName = language === 'c' ? 'C' : language[0].toUpperCase() + language.slice(1);
+      const baselineAlternative = language === 'c'
+        ? 'Use a hash-backed lookup or a sorted input strategy, while keeping ownership and bounds explicit.'
+        : language === 'python'
+          ? 'Use a set or dictionary for membership, then materialize only the output you need.'
+          : 'Replace the repeated array lookup with a Set, then materialize the array at the end.';
+      const alternative = asksForMemory
+        ? 'Prefer a streaming or sorted approach that bounds peak memory, even if it adds a pass or more I/O.'
+        : asksForSecurity
+          ? 'Keep the simpler path, validate input boundaries, and avoid dynamic evaluation or unchecked native memory access.'
+          : asksForReliability
+            ? 'Prefer the smallest testable change: isolate the lookup, add boundary tests, and measure before tuning further.'
+            : asksForScale
+              ? 'Use a keyed lookup and batch the work so runtime stays predictable as the dataset grows.'
+              : baselineAlternative;
+      const tradeoff = asksForMemory
+        ? 'Lower RAM use can cost an extra pass, more I/O, or slower random access. The greener choice depends on which resource is constrained.'
+        : asksForSecurity
+          ? 'A stricter validation path may add a small amount of CPU and code, but reduces incident risk and unsafe work.'
+          : asksForReliability
+            ? 'A simpler, more observable implementation may give up a small peak-speed gain in exchange for easier testing and safer maintenance.'
+            : isEfficient
+              ? 'The keyed lookup uses a little more memory, while avoiding repeated scans and lowering runtime at larger input sizes.'
+              : 'A keyed lookup uses more memory for the index, while cutting repeated work and improving runtime as input grows.';
+      const forecast = asksForScale
+        ? 'At 10× input size, the current shape is likely to become the bottleneck; the recommended path keeps growth more predictable.'
+        : asksForMemory
+          ? 'Under a constrained-memory workload, the lower-peak option is more likely to stay stable even when it is not the fastest.'
+          : `For a ${languageName} hot path, measure at production input sizes before adopting the alternative.`;
       const next: Analysis = {
         id: `analysis-${Date.now()}`,
         fileName: fileName || samples[language].fileName,
         language,
         createdAt: new Date().toISOString(),
-        score: isEfficient ? 94 : 82,
+        score,
         complexity: isEfficient ? 'O(n)' : 'O(n²) → O(n)',
         runtimeEstimate: isEfficient ? '7.1 ms' : '18.4 ms',
-        memoryEstimate: isEfficient ? '2.7 MB' : '2.1 MB',
+        memoryEstimate: isEfficient ? (asksForMemory ? '1.8 MB' : '2.7 MB') : '2.1 MB',
         summary: isEfficient ? 'A keyed lookup keeps work proportional to input size and avoids repeated scans.' : 'Repeated membership scans make this routine grow quickly as the input gets larger.',
-        findings: isEfficient ? ['Keyed membership is constant-time on average.', 'The output contract is preserved without extra passes.'] : ['Membership is scanned on every pass through the input.', 'A Set gives constant-time checks with a small memory tradeoff.'],
-        alternative: isEfficient ? 'This is already a strong baseline. Consider measuring allocation pressure at production input sizes.' : 'Replace the repeated array lookup with a Set, then materialize the array at the end.',
-        tradeoff: isEfficient ? 'No meaningful algorithmic change recommended. Profile I/O and allocation before changing the shape.' : 'Uses ~0.6 MB more memory for a 10k item input, while cutting runtime by an estimated 63%.',
+        findings: [
+          ...(isEfficient ? ['Keyed membership is constant-time on average.', 'The output contract is preserved without extra passes.'] : ['Membership is scanned on every pass through the input.', 'A keyed lookup can avoid repeated scans with a deliberate memory tradeoff.']),
+          ...(asksForSecurity ? ['Input boundaries and unsafe operations should be reviewed before optimizing further.'] : []),
+          ...(asksForReliability ? ['Keep the change easy to test and verify with representative fixtures.'] : []),
+        ],
+        alternative,
+        tradeoff,
         saved: false,
+        priority: optimizationGoals.find((item) => item.value === goal)?.label,
+        forecast,
+        confidence: 'Heuristic estimate · verify with a benchmark',
       };
       setResult(next);
       setIsRunning(false);
@@ -375,9 +464,10 @@ function Analyzer() {
   }
 
   return <div className="animate-rise-in">
-    <PageTitle eyebrow="Code analyzer" title="Evidence before instincts." detail="Paste a focused function, choose its language, and get a practical read on complexity and energy tradeoffs." action={<div className="mono hidden items-center gap-2 text-[10px] text-muted-foreground sm:flex"><span className="h-1.5 w-1.5 rounded-full bg-primary" /> LOCAL MODE</div>} />
+    <PageTitle eyebrow="Code analyzer" title="Evidence before instincts." detail="Paste a focused function, choose its language, and tell EcoDev what matters most before it compares the tradeoffs." action={<div className="mono hidden items-center gap-2 text-[10px] text-muted-foreground sm:flex"><span className="h-1.5 w-1.5 rounded-full bg-primary" /> LOCAL · BRIDGE OPTIONAL</div>} />
+    <section className="mb-5 rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6" data-testid="panel-optimization-brief"><div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><div className="mono mb-2 text-[10px] uppercase tracking-[.16em] text-primary">Optimization brief</div><h2 className="text-[15px] font-extrabold">What should this code optimize for?</h2><p className="mt-1 max-w-[600px] text-[11px] leading-relaxed text-muted-foreground">EcoDev will change its recommendation and explain what you give up. You stay in control of the decision.</p></div><span className="rounded-full bg-secondary px-2.5 py-1 mono text-[9px] uppercase tracking-[.1em] text-secondary-foreground" data-testid="status-selected-goal">{optimizationGoals.find((item) => item.value === goal)?.label}</span></div><div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">{optimizationGoals.map((item) => <button key={item.value} onClick={() => setGoal(item.value)} className={`rounded-xl border px-3 py-3 text-left transition-colors ${goal === item.value ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-background hover:bg-muted'}`} data-testid={`button-goal-${item.value}`}><span className="block text-[11px] font-extrabold">{item.label}</span><span className="mt-1 block text-[9px] leading-relaxed text-muted-foreground">{item.detail}</span></button>)}</div><div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"><label htmlFor="analysis-constraints" className="shrink-0 text-[10px] font-bold uppercase tracking-[.1em] text-muted-foreground">Extra constraints</label><input id="analysis-constraints" value={constraints} onChange={(event) => setConstraints(event.target.value)} className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-[11px] outline-none focus:ring-2 focus:ring-ring" placeholder="e.g. must be secure, reliable, scalable, and stay under 512 MB" data-testid="input-analysis-constraints" /></div></section>
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,.9fr)]">
-      <section className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4"><div className="flex items-center gap-2"><FileCode2 size={16} className="text-primary" /><input value={fileName} onChange={(event) => setFileName(event.target.value)} className="w-[160px] bg-transparent text-[12px] font-bold outline-none sm:w-[210px]" data-testid="input-file-name" aria-label="File name" /><span className="rounded bg-muted px-1.5 py-1 mono text-[9px] uppercase text-muted-foreground">{language}</span></div><div className="flex items-center gap-2"><select value={language} onChange={(event) => chooseLanguage(event.target.value)} className="rounded-lg border border-input bg-background px-2.5 py-2 text-[11px] font-semibold outline-none focus:ring-2 focus:ring-ring" data-testid="select-language" aria-label="Language"><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="go">Go</option></select><button onClick={loadSample} className="inline-flex items-center gap-1.5 rounded-lg border border-input px-2.5 py-2 text-[11px] font-bold text-muted-foreground hover:bg-muted" data-testid="button-load-sample"><Clipboard size={13} /> Sample</button></div></div><div className="relative bg-[#172c20] p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><span className="mono text-[10px] text-[#8ba58b]">EDIT BUFFER / {code.split('\n').length} lines</span><span className="text-[10px] text-[#779078]">No upload needed</span></div><textarea value={code} onChange={(event) => { setCode(event.target.value); setError(''); }} spellCheck={false} className="scrollbar-thin min-h-[390px] w-full resize-y bg-transparent mono text-[12px] leading-[1.85] text-[#d8e8cc] outline-none placeholder:text-[#67806c]" data-testid="textarea-code" aria-label="Code editor" placeholder="Paste a function to inspect..." /><div className="mt-3 flex items-center justify-between border-t border-[#36533e] pt-3"><span className="mono text-[9px] text-[#779078]">SHIFT + ENTER to run</span><button onClick={runAnalysis} disabled={isRunning} className="inline-flex items-center gap-2 rounded-lg bg-[#c6ed51] px-3.5 py-2 text-[11px] font-extrabold text-[#183d2a] transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70" data-testid="button-run-analysis">{isRunning ? <RotateCcw size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}{isRunning ? 'Analyzing…' : 'Run analysis'}</button></div></div>{error && <div className="flex items-center gap-2 border-t border-[#efc8c2] bg-[#fff2ef] px-5 py-3 text-[11px] font-semibold text-[#9c463c]" data-testid="status-analyzer-error"><CircleHelp size={15} /> {error}</div>}</section>
+       <section className="overflow-hidden rounded-2xl border border-card-border bg-card shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4"><div className="flex items-center gap-2"><FileCode2 size={16} className="text-primary" /><input value={fileName} onChange={(event) => setFileName(event.target.value)} className="w-[160px] bg-transparent text-[12px] font-bold outline-none sm:w-[210px]" data-testid="input-file-name" aria-label="File name" /><span className="rounded bg-muted px-1.5 py-1 mono text-[9px] uppercase text-muted-foreground">{language}</span></div><div className="flex items-center gap-2"><select value={language} onChange={(event) => chooseLanguage(event.target.value)} className="rounded-lg border border-input bg-background px-2.5 py-2 text-[11px] font-semibold outline-none focus:ring-2 focus:ring-ring" data-testid="select-language" aria-label="Language"><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="go">Go</option><option value="c">C</option></select><button onClick={loadSample} className="inline-flex items-center gap-1.5 rounded-lg border border-input px-2.5 py-2 text-[11px] font-bold text-muted-foreground hover:bg-muted" data-testid="button-load-sample"><Clipboard size={13} /> Sample</button></div></div><div className="relative bg-[#172c20] p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><span className="mono text-[10px] text-[#8ba58b]">EDIT BUFFER / {code.split('\n').length} lines</span><span className="text-[10px] text-[#779078]">No upload needed</span></div><textarea value={code} onChange={(event) => { setCode(event.target.value); setError(''); }} spellCheck={false} className="scrollbar-thin min-h-[390px] w-full resize-y bg-transparent mono text-[12px] leading-[1.85] text-[#d8e8cc] outline-none placeholder:text-[#67806c]" data-testid="textarea-code" aria-label="Code editor" placeholder="Paste a function to inspect..." /><div className="mt-3 flex items-center justify-between border-t border-[#36533e] pt-3"><span className="mono text-[9px] text-[#779078]">SHIFT + ENTER to run</span><button onClick={runAnalysis} disabled={isRunning} className="inline-flex items-center gap-2 rounded-lg bg-[#c6ed51] px-3.5 py-2 text-[11px] font-extrabold text-[#183d2a] transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70" data-testid="button-run-analysis">{isRunning ? <RotateCcw size={13} className="animate-spin" /> : <Play size={13} fill="currentColor" />}{isRunning ? 'Analyzing…' : 'Run analysis'}</button></div></div>{error && <div className="flex items-center gap-2 border-t border-[#efc8c2] bg-[#fff2ef] dark:border-[#5c352f] dark:bg-[#2d1d1b] dark:text-[#f2b3a7] px-5 py-3 text-[11px] font-semibold text-[#9c463c]" data-testid="status-analyzer-error"><CircleHelp size={15} /> {error}</div>}</section>
       <AnalysisResult result={result} isRunning={isRunning} onSave={saveResult} notice={notice} />
     </div>
     <div className="mt-5 flex items-start gap-3 rounded-xl border border-border bg-card/60 px-4 py-3 text-[11px] leading-relaxed text-muted-foreground"><ShieldCheck size={15} className="mt-0.5 shrink-0 text-primary" /><span>EcoDev estimates algorithmic and local resource behavior. It does not upload code or replace profiling in your production environment.</span></div>
@@ -387,10 +477,11 @@ function Analyzer() {
 function AnalysisResult({ result, isRunning, onSave, notice }: { result: Analysis | null; isRunning: boolean; onSave: () => void; notice: string }) {
   if (isRunning) return <section className="space-y-3" data-testid="status-analyzer-loading"><div className="h-[190px] animate-pulse rounded-2xl border border-card-border bg-card" /><div className="h-[170px] animate-pulse rounded-2xl border border-card-border bg-card" /><div className="h-[130px] animate-pulse rounded-2xl border border-card-border bg-card" /></section>;
   if (!result) return <section className="flex min-h-[490px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#b7cdaa] bg-card/55 p-8 text-center" data-testid="empty-analysis-result"><span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-primary"><BarChart3 size={22} /></span><h2 className="text-[16px] font-extrabold tracking-[-0.03em]">Your readout will land here</h2><p className="mt-2 max-w-[240px] text-[12px] leading-relaxed text-muted-foreground">Run an analysis to see the complexity, likely runtime, and a practical alternative.</p><div className="mt-5 mono text-[9px] uppercase tracking-[.12em] text-muted-foreground">Awaiting code</div></section>;
-  return <section className="space-y-4" data-testid="analysis-result">
-    <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="flex items-start justify-between gap-4"><div><div className="mb-2 flex items-center gap-2"><span className="rounded bg-[#e5f2c3] px-2 py-1 mono text-[9px] font-medium uppercase text-[#477044]">Complete</span><span className="mono text-[10px] text-muted-foreground">{result.language}</span></div><h2 className="text-[18px] font-extrabold tracking-[-0.05em]">Efficiency readout</h2></div><ScoreRing score={result.score} size="small" /></div><p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">{result.summary}</p><div className="mt-5 grid grid-cols-3 gap-2"><Readout label="Complexity" value={result.complexity} /><Readout label="Runtime" value={result.runtimeEstimate} /><Readout label="Memory" value={result.memoryEstimate} /></div></div>
-    <div className="rounded-2xl border border-[#cfe6a2] bg-[#f1f7df] p-5"><div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.09em] text-[#396642]"><Sparkles size={14} /> Recommended alternative</div><p className="mt-3 text-[13px] font-bold leading-relaxed text-[#294e35]">{result.alternative}</p><div className="mt-4 border-t border-[#d6e8ae] pt-3 text-[11px] leading-relaxed text-[#55725c]"><span className="font-extrabold text-[#396642]">Tradeoff: </span>{result.tradeoff}</div></div>
-    <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm"><div className="mb-3 flex items-center justify-between"><h3 className="text-[13px] font-extrabold">What we noticed</h3><span className="mono text-[9px] text-muted-foreground">{result.findings.length} signals</span></div><ul className="space-y-2.5">{result.findings.map((finding, index) => <li key={finding} className="flex gap-2.5 text-[11px] leading-relaxed text-muted-foreground"><Check size={14} className="mt-0.5 shrink-0 text-primary" />{finding}</li>)}</ul><div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-[10px] text-muted-foreground">{notice || (result.saved ? 'Saved in local history' : 'Not saved yet')}</span><button onClick={onSave} disabled={result.saved} className="inline-flex items-center gap-1.5 rounded-lg border border-input px-3 py-2 text-[11px] font-bold text-foreground hover:bg-muted disabled:cursor-default disabled:opacity-60" data-testid="button-save-analysis">{result.saved ? <Check size={13} /> : <Save size={13} />}{result.saved ? 'Saved' : 'Save analysis'}</button></div></div>
+   return <section className="space-y-4" data-testid="analysis-result">
+     <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="flex items-start justify-between gap-4"><div><div className="mb-2 flex items-center gap-2"><span className="rounded bg-[#e5f2c3] px-2 py-1 mono text-[9px] font-medium uppercase text-[#477044] dark:bg-[#365c3d] dark:text-[#c6ed51]">Complete</span><span className="mono text-[10px] text-muted-foreground">{result.language}</span></div><h2 className="text-[18px] font-extrabold tracking-[-0.05em]">Efficiency readout</h2></div><ScoreRing score={result.score} size="small" /></div><p className="mt-4 text-[12px] leading-relaxed text-muted-foreground">{result.summary}</p><div className="mt-5 grid grid-cols-3 gap-2"><Readout label="Complexity" value={result.complexity} /><Readout label="Runtime" value={result.runtimeEstimate} /><Readout label="Memory" value={result.memoryEstimate} /></div></div>
+     <div className="rounded-2xl border border-[#cfe6a2] bg-[#f1f7df] p-5 dark:border-[#385c3f] dark:bg-[#1d3825]"><div className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.09em] text-[#396642] dark:text-[#c6ed51]"><Sparkles size={14} /> Recommended alternative</div><p className="mt-3 text-[13px] font-bold leading-relaxed text-[#294e35] dark:text-[#d8e8cc]">{result.alternative}</p><div className="mt-4 border-t border-[#d6e8ae] pt-3 text-[11px] leading-relaxed text-[#55725c] dark:border-[#385c3f] dark:text-[#a5b9a3]"><span className="font-extrabold text-[#396642] dark:text-[#c6ed51]">Tradeoff: </span>{result.tradeoff}</div></div>
+     <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm" data-testid="panel-analysis-decision"><div className="grid gap-4 sm:grid-cols-2"><div><p className="mono text-[9px] uppercase tracking-[.12em] text-primary">Decision lens</p><p className="mt-1 text-[13px] font-extrabold">{result.priority || 'Balanced'}</p><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{result.forecast || 'Measure at production input sizes before adopting the alternative.'}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="mono text-[9px] uppercase tracking-[.12em] text-muted-foreground">Confidence</p><p className="mt-1 text-[11px] font-bold">{result.confidence || 'Heuristic estimate'}</p><p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">EcoDev guides the decision; it does not claim a bug-free or security-certified result.</p></div></div></div>
+     <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm"><div className="mb-3 flex items-center justify-between"><h3 className="text-[13px] font-extrabold">What we noticed</h3><span className="mono text-[9px] text-muted-foreground">{result.findings.length} signals</span></div><ul className="space-y-2.5">{result.findings.map((finding, index) => <li key={`${finding}-${index}`} className="flex gap-2.5 text-[11px] leading-relaxed text-muted-foreground"><Check size={14} className="mt-0.5 shrink-0 text-primary" />{finding}</li>)}</ul><div className="mt-5 flex items-center justify-between border-t border-border pt-4"><span className="text-[10px] text-muted-foreground">{notice || (result.saved ? 'Saved in local history' : 'Not saved yet')}</span><button onClick={onSave} disabled={result.saved} className="inline-flex items-center gap-1.5 rounded-lg border border-input px-3 py-2 text-[11px] font-bold text-foreground hover:bg-muted disabled:cursor-default disabled:opacity-60" data-testid="button-save-analysis">{result.saved ? <Check size={13} /> : <Save size={13} />}{result.saved ? 'Saved' : 'Save analysis'}</button></div></div>
   </section>;
 }
 
@@ -418,7 +509,7 @@ function History() {
     const blob = new Blob([JSON.stringify(analyses, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'ecodev-history.json'; anchor.click(); URL.revokeObjectURL(url);
   }
-  return <div className="animate-rise-in"><PageTitle eyebrow="Saved work" title="History you can use." detail="Keep useful comparisons close. Everything here is stored locally in this browser." action={<button onClick={exportAll} className="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 py-2.5 text-[12px] font-bold shadow-sm hover:bg-muted" data-testid="button-export-all"><Download size={15} /> Export all</button>} /><section className="rounded-2xl border border-card-border bg-card shadow-sm"><div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between md:px-5"><div className="relative flex-1 md:max-w-[330px]"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search analyses" className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-[11px] outline-none focus:ring-2 focus:ring-ring" data-testid="input-search-history" /></div><div className="flex items-center gap-2"><select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-[11px] font-semibold outline-none" data-testid="select-history-language"><option value="all">All languages</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="go">Go</option></select><span className="mono hidden text-[10px] text-muted-foreground sm:inline">{filtered.length} results</span></div></div>{filtered.length === 0 ? <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center" data-testid="empty-history"><span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Search size={19} /></span><h2 className="text-[14px] font-extrabold">No matching analyses</h2><p className="mt-2 text-[11px] text-muted-foreground">Try another search or run a new analysis.</p><Link href="/analyzer" data-testid="link-empty-history-analyzer" className="mt-4 text-[11px] font-bold text-primary hover:underline">Open analyzer</Link></div> : <div className="divide-y divide-border">{filtered.map((item) => <HistoryRow key={item.id} item={item} onDelete={deleteItem} onExport={exportItem} />)}</div>}</section></div>;
+  return <div className="animate-rise-in"><PageTitle eyebrow="Saved work" title="History you can use." detail="Keep useful comparisons close. Everything here is stored locally in this browser." action={<button onClick={exportAll} className="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-card px-4 py-2.5 text-[12px] font-bold shadow-sm hover:bg-muted" data-testid="button-export-all"><Download size={15} /> Export all</button>} /><section className="rounded-2xl border border-card-border bg-card shadow-sm"><div className="flex flex-col gap-3 border-b border-border p-4 md:flex-row md:items-center md:justify-between md:px-5"><div className="relative flex-1 md:max-w-[330px]"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search analyses" className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-[11px] outline-none focus:ring-2 focus:ring-ring" data-testid="input-search-history" /></div><div className="flex items-center gap-2"><select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-[11px] font-semibold outline-none" data-testid="select-history-language"><option value="all">All languages</option><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="go">Go</option><option value="c">C</option></select><span className="mono hidden text-[10px] text-muted-foreground sm:inline">{filtered.length} results</span></div></div>{filtered.length === 0 ? <div className="flex min-h-[300px] flex-col items-center justify-center p-8 text-center" data-testid="empty-history"><span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground"><Search size={19} /></span><h2 className="text-[14px] font-extrabold">No matching analyses</h2><p className="mt-2 text-[11px] text-muted-foreground">Try another search or run a new analysis.</p><Link href="/analyzer" data-testid="link-empty-history-analyzer" className="mt-4 text-[11px] font-bold text-primary hover:underline">Open analyzer</Link></div> : <div className="divide-y divide-border">{filtered.map((item) => <HistoryRow key={item.id} item={item} onDelete={deleteItem} onExport={exportItem} />)}</div>}</section></div>;
 }
 
 function HistoryRow({ item, onDelete, onExport }: { item: Analysis; onDelete: (id: string) => void; onExport: (item: Analysis) => void }) {
@@ -453,6 +544,12 @@ function Settings() {
     setNotice('Settings updated');
     setTimeout(() => setNotice(''), 1900);
   }
+  function copyVscodeBrief() {
+    const brief = 'EcoDev VS Code companion: send the active file, language, compile status, and optional benchmark results to the local analyzer. Never upload source code.';
+    navigator.clipboard?.writeText(brief);
+    setNotice('VS Code setup brief copied');
+    setTimeout(() => setNotice(''), 2200);
+  }
   function resetData() {
     localStorage.removeItem(storageKey);
     localStorage.removeItem(settingsKey);
@@ -460,7 +557,21 @@ function Settings() {
     setNotice('Local data reset to demo state');
     setTimeout(() => setNotice(''), 2200);
   }
-  return <div className="animate-rise-in"><PageTitle eyebrow="Workspace controls" title="Set your boundaries." detail="EcoDev is local by default. Tune what it watches and decide how long your evidence stays around." action={notice ? <span className="flex items-center gap-2 text-[11px] font-bold text-primary" data-testid="status-settings-notice"><Check size={14} /> {notice}</span> : undefined} /><div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><section className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-6"><h2 className="text-[15px] font-extrabold">Monitoring readiness</h2><p className="mt-1 text-[11px] text-muted-foreground">Choose whether EcoDev can read lightweight local process samples.</p></div><div className="space-y-1"><ToggleRow title="Enable local monitoring" detail="Read CPU, memory, and I/O snapshots from this device." checked={monitoring} onChange={(checked) => { setMonitoring(checked); saveSettings({ monitoring: checked }); }} testId="toggle-monitoring" /><ToggleRow title="Save analyzer results automatically" detail="Keep completed readouts in local history unless you remove them." checked={autoSave} onChange={(checked) => { setAutoSave(checked); saveSettings({ autoSave: checked }); }} testId="toggle-autosave" /></div><div className="mt-7 border-t border-border pt-6"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-extrabold">Efficiency threshold</h3><p className="mt-1 text-[11px] text-muted-foreground">Flag scores below this number for another look.</p></div><span className="mono text-[17px] font-medium text-primary" data-testid="text-threshold-value">{threshold}</span></div><input type="range" min="50" max="95" value={threshold} onChange={(event) => { const value = Number(event.target.value); setThreshold(value); saveSettings({ threshold: value }); }} className="mt-5 w-full accent-[#2c7a4b]" data-testid="input-threshold" /><div className="mt-2 flex justify-between mono text-[9px] text-muted-foreground"><span>50 / flexible</span><span>95 / strict</span></div></div></section><section className="space-y-5"><div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary"><ShieldCheck size={17} /></span><div><h2 className="text-[14px] font-extrabold">Privacy posture</h2><p className="mt-1 text-[10px] text-muted-foreground">Ready for local-first work</p></div></div><div className="space-y-3 text-[11px]"><StatusLine label="Code uploads" value="Never" /><StatusLine label="Data storage" value="This browser" /><StatusLine label="Monitoring" value={monitoring ? 'Ready' : 'Paused'} /></div></div><div className="rounded-2xl border border-[#e4c9bf] bg-[#fff7f2] p-5 md:p-6"><div className="flex gap-3"><Trash2 size={16} className="mt-0.5 shrink-0 text-[#a75a43]" /><div><h2 className="text-[13px] font-extrabold text-[#704335]">Local data controls</h2><p className="mt-1 text-[11px] leading-relaxed text-[#936653]">Reset saved analyses and preferences back to the demo state. This cannot be undone.</p><button onClick={resetData} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#ddb7a9] px-3 py-2 text-[11px] font-bold text-[#8f4d3d] hover:bg-[#fbe8df]" data-testid="button-reset-data"><RotateCcw size={13} /> Reset local data</button></div></div></div></section></div></div>;
+  return <div className="animate-rise-in">
+    <PageTitle eyebrow="Workspace controls" title="Set your boundaries." detail="EcoDev is local by default. Tune what it watches, choose the limits that matter, and decide how your editor connects." action={notice ? <span className="flex items-center gap-2 text-[11px] font-bold text-primary" data-testid="status-settings-notice"><Check size={14} /> {notice}</span> : undefined} />
+    <div className="grid gap-5 lg:grid-cols-[1.1fr_.9fr]">
+      <section className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6">
+        <div className="mb-6"><h2 className="text-[15px] font-extrabold">Monitoring readiness</h2><p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">Prepare lightweight CPU, memory, and I/O samples. Full laptop-wide process access requires the optional desktop companion.</p></div>
+        <div className="space-y-1"><ToggleRow title="Enable local monitoring" detail="Keep the monitoring surface ready for a permitted desktop companion." checked={monitoring} onChange={(checked) => { setMonitoring(checked); saveSettings({ monitoring: checked }); }} testId="toggle-monitoring" /><ToggleRow title="Save analyzer results automatically" detail="Keep completed readouts in local history unless you remove them." checked={autoSave} onChange={(checked) => { setAutoSave(checked); saveSettings({ autoSave: checked }); }} testId="toggle-autosave" /></div>
+        <div className="mt-7 border-t border-border pt-6"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-extrabold">Efficiency threshold</h3><p className="mt-1 text-[11px] text-muted-foreground">Flag scores below this number for another look.</p></div><span className="mono text-[17px] font-medium text-primary" data-testid="text-threshold-value">{threshold}</span></div><input type="range" min="50" max="95" value={threshold} onChange={(event) => { const value = Number(event.target.value); setThreshold(value); saveSettings({ threshold: value }); }} className="mt-5 w-full accent-[#2c7a4b]" data-testid="input-threshold" /><div className="mt-2 flex justify-between mono text-[9px] text-muted-foreground"><span>50 / flexible</span><span>95 / strict</span></div></div>
+      </section>
+      <section className="space-y-5">
+        <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary"><ShieldCheck size={17} /></span><div><h2 className="text-[14px] font-extrabold">Privacy posture</h2><p className="mt-1 text-[10px] text-muted-foreground">Ready for local-first work</p></div></div><div className="space-y-3 text-[11px]"><StatusLine label="Code uploads" value="Never" /><StatusLine label="Data storage" value="This browser" /><StatusLine label="Monitoring" value={monitoring ? 'Preview ready' : 'Paused'} /></div></div>
+        <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6" data-testid="panel-vscode-companion"><div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary"><Code2 size={17} /></span><div><h2 className="text-[14px] font-extrabold">VS Code companion</h2><p className="mt-1 text-[10px] text-muted-foreground">A clear handoff for editor integration</p></div></div><div className="rounded-xl bg-muted/70 p-3"><div className="flex items-center justify-between gap-3"><span className="mono text-[9px] uppercase tracking-[.1em] text-muted-foreground">Connection</span><span className="flex items-center gap-1.5 text-[10px] font-bold text-[#c38b3c]"><span className="h-1.5 w-1.5 rounded-full bg-[#c38b3c]" /> Not connected</span></div><p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">When added, the companion can send active-file context and compile events locally. It should never send source code to a remote service.</p></div><button onClick={copyVscodeBrief} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-input px-3 py-2 text-[11px] font-bold hover:bg-muted" data-testid="button-copy-vscode-brief"><Clipboard size={13} /> Copy setup brief</button></div>
+        <div className="rounded-2xl border border-[#e4c9bf] bg-[#fff7f2] p-5 dark:border-[#5c352f] dark:bg-[#2d1d1b] md:p-6"><div className="flex gap-3"><Trash2 size={16} className="mt-0.5 shrink-0 text-[#a75a43]" /><div><h2 className="text-[13px] font-extrabold text-[#704335] dark:text-[#f2b3a7]">Local data controls</h2><p className="mt-1 text-[11px] leading-relaxed text-[#936653] dark:text-[#d69a8c]">Reset saved analyses and preferences back to the demo state. This cannot be undone.</p><button onClick={resetData} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#ddb7a9] px-3 py-2 text-[11px] font-bold text-[#8f4d3d] hover:bg-[#fbe8df] dark:border-[#704137] dark:text-[#f2b3a7] dark:hover:bg-[#442521]" data-testid="button-reset-data"><RotateCcw size={13} /> Reset local data</button></div></div></div>
+      </section>
+    </div>
+  </div>;
 }
 
 function ToggleRow({ title, detail, checked, onChange, testId }: { title: string; detail: string; checked: boolean; onChange: (value: boolean) => void; testId: string }) {
