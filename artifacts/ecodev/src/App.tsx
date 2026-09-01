@@ -269,6 +269,10 @@ function Shell({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle('dark', useDark);
   }, []);
 
+  useEffect(() => {
+    setOpen(false);
+  }, [location]);
+
   function toggleTheme() {
     const next = !dark;
     setDark(next);
@@ -278,29 +282,29 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="grain flex min-h-[100dvh] bg-background">
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[250px] flex-col bg-sidebar px-5 py-6 text-sidebar-foreground transition-transform duration-300 md:static md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`} data-testid="sidebar-navigation">
-        <div className="mb-12 flex items-center justify-between"><Logo /><button onClick={() => setOpen(false)} className="rounded-md p-1 text-[#95aa95] md:hidden" data-testid="button-close-navigation"><X size={18} /></button></div>
-        <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.17em] text-[#789178]">Workspace</div>
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(250px,86vw)] flex-col border-r border-sidebar-border bg-sidebar px-5 py-6 text-sidebar-foreground shadow-[14px_0_36px_rgba(0,0,0,0.28)] transition-transform duration-300 md:static md:translate-x-0 md:shadow-none ${open ? 'translate-x-0' : '-translate-x-full'}`} data-testid="sidebar-navigation">
+        <div className="mb-12 flex items-center justify-between"><Logo /><button onClick={() => setOpen(false)} aria-label="Close navigation" className="rounded-lg p-2 text-[#dcebd1] transition-colors hover:bg-sidebar-accent hover:text-[#c6ed51] md:hidden" data-testid="button-close-navigation"><X size={18} /></button></div>
+        <div className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.17em] text-[#93aa96]">Workspace</div>
         <nav className="space-y-1" aria-label="Primary navigation">
           {links.map(({ href, label, icon: Icon, test }) => (
-            <Link key={href} href={href} onClick={() => setOpen(false)} data-testid={`link-nav-${test}`} className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${location === href ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-[#a7b8a4] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}>
+            <Link key={href} href={href} onClick={() => setOpen(false)} data-testid={`link-nav-${test}`} className={`group flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] font-semibold transition-colors ${location === href ? 'bg-[#2c5b3d] text-[#f3f8e7] shadow-sm ring-1 ring-[#c6ed51]/20' : 'text-[#cfddc9] hover:bg-[#234c34] hover:text-[#ffffff]'}`}>
               <Icon size={17} strokeWidth={location === href ? 2.4 : 1.8} /><span>{label}</span>
               {label === 'Analyzer' && <span className="ml-auto rounded bg-[#c6ed51]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#c6ed51]">LIVE</span>}
             </Link>
           ))}
         </nav>
-        <div className="mt-10 mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.17em] text-[#789178]">Workspace</div>
-        <Link href="/settings" onClick={() => setOpen(false)} data-testid="link-nav-settings" className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors ${location === '/settings' ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-[#a7b8a4] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`}><SettingsIcon size={17} /><span>Settings</span></Link>
-        <div className="mt-auto rounded-xl border border-sidebar-border bg-[#234231]/50 p-3.5">
+        <div className="mt-10 mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.17em] text-[#93aa96]">Workspace</div>
+        <Link href="/settings" onClick={() => setOpen(false)} data-testid="link-nav-settings" className={`flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] font-semibold transition-colors ${location === '/settings' ? 'bg-[#2c5b3d] text-[#f3f8e7] shadow-sm ring-1 ring-[#c6ed51]/20' : 'text-[#cfddc9] hover:bg-[#234c34] hover:text-[#ffffff]'}`}><SettingsIcon size={17} /><span>Settings</span></Link>
+        <div className="mt-auto rounded-xl border border-sidebar-border bg-[#183625] p-3.5">
           <div className="mb-2 flex items-center gap-2 text-[11px] font-bold text-[#d6e6c5]"><span className="h-1.5 w-1.5 rounded-full bg-[#c6ed51]" /> Local workspace</div>
           <p className="text-[11px] leading-relaxed text-[#90a592]">Analyses stay in this browser. Nothing leaves your machine.</p>
           <Link href="/settings" data-testid="link-local-settings" className="mt-3 inline-flex text-[11px] font-bold text-[#c6ed51] hover:underline">Review controls <ArrowUpRight size={12} className="ml-1" /></Link>
         </div>
       </aside>
-      {open && <button aria-label="Close navigation" onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-[#13271c]/35 md:hidden" data-testid="button-navigation-overlay" />}
+      {open && <button aria-label="Close navigation" onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-[#06140d]/70 backdrop-blur-[2px] md:hidden" data-testid="button-navigation-overlay" />}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-[72px] shrink-0 items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-md md:px-9">
-          <button onClick={() => setOpen(true)} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden" data-testid="button-open-navigation"><Menu size={20} /></button>
+          <button onClick={() => setOpen(true)} aria-label="Open navigation" aria-expanded={open} className="rounded-lg border border-border bg-card p-2.5 text-foreground shadow-sm transition-colors hover:bg-muted md:hidden" data-testid="button-open-navigation"><Menu size={20} /></button>
           <div className="hidden items-center gap-2 text-[12px] text-muted-foreground md:flex"><span className="mono text-[10px] text-primary">ECODEV /</span><span>{location === '/' ? 'overview' : location.replace('/', '')}</span></div>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={toggleTheme} className="rounded-lg p-2.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-testid="button-toggle-theme" aria-label="Toggle theme">{dark ? <Sparkles size={17} /> : <Moon size={17} />}</button>
