@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "EcoDev Code Analyzer"
+description = "A developer-focused green computing workspace that analyzes code quality, complexity, performance tradeoffs, and resource efficiency in one calm dashboard."
+version = "1.0.0"
+id = "artifacts/ecodev"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19529
+
+[services.development]
+run = "pnpm --filter @workspace/ecodev run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ecodev", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ecodev/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19529"
+BASE_PATH = "/"

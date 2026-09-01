@@ -1,0 +1,551 @@
+convert this code into app and give app download link like playstore like app
+use many reasearch paper and experiment data as well for facts and accuracy and whole type of data
+2 ) it can help coder engineer like whenever coder right code they gonna give suggestions to them use this code or alternate code that are faster less memmoory most efficient thus consume less energy and contribute to green computing
+also it run on laptop background and see all existing app and contribution suggestions better or eco friendly app
+also trade of also give what they scarifcie if they use that alternative
+whenever code write code in vs code then also see this and suggest alternative if it is required
+
+make ui and ux more attractive like amazon green colour simple so that easy to use 
+and whenever coder engineer use vs code then analyze that and give and suggest brute approch so it gonna help coder into leetcode and time complexity and trade of also tell and eco friendly suggestion also tell so let them user decide which option to use
+
+code anaylzer not only I'm talking about leet code anycode those who are working in Amazon big tech faang company swe that there engineer also get help by this app
+make like this app
+use many reasearch paper for better accuracy and data driven
+
+#!/usr/bin/env python3
+"""
+EcoDev: Smart Code Analyzer — Final Single‑File Version with Code‑Level Suggestions
+Monitors processes, calculates green scores, and offers developer‑friendly optimization tips.
+"""
+
+import sys, os, time, json, logging, sqlite3, csv, re
+from datetime import datetime
+from pathlib import Path
+import psutil
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
+    QTableView, QHeaderView, QPushButton, QFileDialog, QMessageBox, QLabel,
+    QListWidget, QSystemTrayIcon, QMenu, QAction, QAbstractTableModel, QModelIndex
+)
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QIcon
+
+# ------------------- CONFIG -------------------
+APP_NAME = "EcoDev"
+DATA_DIR = Path.home() / ".ecodev"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_PATH = DATA_DIR / "ecodev.db"
+LOG_FILE = DATA_DIR / "ecodev.log"
+SAMPLE_INTERVAL = 5
+CPU_HIGH = 70.0
+MEM_HIGH = 1024
+DISK_HIGH = 10 * 1024 * 1024
+LONG_RUN = 300
+
+logging.basicConfig(
+    filename=LOG_FILE,
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+# ------------------- DATABASE -------------------
+class Database:
+    def __init__(self):
+        self.conn = sqlite3.connect(DB_PATH)
+        self._create()
+    def _create(self):
+        cur = self.conn.cursor()
+        cur.execute('''CREATE TABLE IF NOT EXISTS runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT, path TEXT, version TEXT,
+            start_time TEXT, end_time TEXT, total_runtime REAL,
+            cpu_avg REAL, cpu_max REAL, mem_avg REAL, mem_max REAL,
+            disk_io REAL, green_score REAL, recommendation TEXT, timestamp TEXT
+        )''')
+        self.conn.commit()
+    def insert(self, d):
+        cur = self.conn.cursor()
+        cur.execute('''INSERT INTO runs VALUES (NULL,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (d['name'], d['path'], d.get('version',''), d['start_time'], d['end_time'],
+             d['total_runtime'], d['cpu_avg'], d['cpu_max'], d['mem_avg'], d['mem_max'],
+             d['disk_io'], d['green_score'], d['recommendation'], d['timestamp']))
+        self.conn.commit()
+    def all(self, limit=100):
+        cur = self.conn.cursor()
+        cur.execute('SELECT * FROM runs ORDER BY timestamp DESC LIMIT ?', (limit,))
+        cols = [c[0] for c in cur.description]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
+    def close(self): self.conn.close()
+
+# ------------------- SCORING -------------------
+def eco_score(cpu_avg, mem_avg_mb, disk_io, runtime):
+    cpu_p = min(cpu_avg/100, 1)
+    mem_p = min(mem_avg_mb/2048, 1)
+    disk_p = min(disk_io/(100*1024*1024), 1)
+    run_p = min(runtime/3600, 1)
+    total = cpu_p*0.4 + mem_p*0.4 + disk_p*0.1 + run_p*0.1
+    return round(max(0, min(100, 100*(1-total))), 1)
+
+# ------------------- PROJECT ANALYZER (NEW) -------------------
+class ProjectAnalyzer:
+    """Scans project directories for common config files and returns optimization tips."""
+    def __init__(self):
+        self.cache = {}   # dir_path -> list of tips
+
+    def get_tips(self, cwd, exe_name):
+        if not cwd:
+            return []
+        if cwd in self.cache:
+            return self.cache[cwd]
+
+        tips = []
+        # Walk up to find project root (where a config file is found)
+        project_root = self._find_project_root(cwd)
+        if not project_root:
+            self.cache[cwd] = []
+            return []
+
+        # Check common files
+        tips.extend(self._check_package_json(project_root, exe_name))
+        tips.extend(self._check_requirements_txt(project_root))
+        tips.extend(self._check_pom_xml(project_root))
+        tips.extend(self._check_dockerfile(project_root))
+        tips.extend(self._check_js_ts_config(project_root))
+        tips.extend(self._check_python_files(project_root))
+
+        # Cache and return
+        self.cache[cwd] = tips
+        return tips
+
+    def _find_project_root(self, start):
+        current = Path(start)
+        for parent in [current] + list(current.parents):
+            if any((parent / f).exists() for f in ['package.json', 'requirements.txt', 'pom.xml', 'build.gradle', 'Cargo.toml', 'go.mod', 'Dockerfile', 'setup.py']):
+                return parent
+        return None
+
+    def _check_package_json(self, root, exe_name):
+        tips = []
+        pkg_file = root / 'package.json'
+        if not pkg_file.exists():
+            return tips
+        try:
+            data = json.loads(pkg_file.read_text(encoding='utf-8'))
+            deps = data.get('dependencies', {})
+            dev_deps = data.get('devDependencies', {})
+            all_deps = {**deps, **dev_deps}
+            # Suggest removing unused dependencies (heuristic: if many deps)
+            if len(all_deps) > 30:
+                tips.append("Large number of npm dependencies. Use depcheck to find and remove unused packages, reducing install size and memory.")
+            # Suggest alternative libraries
+            if 'lodash' in all_deps:
+                tips.append("Replace lodash with native JavaScript functions to reduce bundle size and improve performance.")
+            if 'moment' in all_deps:
+                tips.append("Replace moment.js with day.js (lighter, faster) or native Intl.DateTimeFormat.")
+            if 'express' in all_deps:
+                tips.append("Express is solid, but consider Fastify for lower overhead and better performance.")
+            if 'react' in all_deps and 'react-dom' in all_deps:
+                tips.append("For React apps, use code splitting and tree shaking to reduce initial load and CPU usage.")
+            if 'webpack' in dev_deps:
+                tips.append("Webpack can be heavy; try Vite or esbuild for much faster builds and lower resource usage.")
+        except Exception:
+            pass
+        return tips
+
+    def _check_requirements_txt(self, root):
+        tips = []
+        req_file = root / 'requirements.txt'
+        if not req_file.exists():
+            return tips
+        try:
+            lines = req_file.read_text(encoding='utf-8').splitlines()
+            for line in lines:
+                line_lower = line.lower()
+                if 'tensorflow' in line_lower:
+                    tips.append("TensorFlow is heavy. Consider TensorFlow Lite or PyTorch for many tasks, or use quantized models.")
+                if 'pandas' in line_lower and 'modin' not in line_lower:
+                    tips.append("For large datasets, use Modin (parallel pandas) or Polars for faster, memory‑efficient operations.")
+                if 'numpy' in line_lower:
+                    tips.append("NumPy is efficient, but ensure you're using vectorized operations instead of Python loops.")
+        except Exception:
+            pass
+        return tips
+
+    def _check_pom_xml(self, root):
+        tips = []
+        pom = root / 'pom.xml'
+        if not pom.exists():
+            return tips
+        try:
+            content = pom.read_text(encoding='utf-8')
+            if '<artifactId>spring-boot-starter-web</artifactId>' in content:
+                tips.append("Spring Boot is convenient but heavy. For microservices, consider Quarkus or Micronaut for faster startup and lower memory.")
+            if '<artifactId>log4j</artifactId>' in content:
+                tips.append("Log4j2 is faster than Log4j1; switch to Log4j2 or SLF4J with Logback for better performance.")
+        except Exception:
+            pass
+        return tips
+
+    def _check_dockerfile(self, root):
+        tips = []
+        dockerfile = root / 'Dockerfile'
+        if not dockerfile.exists():
+            return tips
+        try:
+            content = dockerfile.read_text(encoding='utf-8')
+            if 'FROM node:' in content and 'alpine' not in content:
+                tips.append("Use node:alpine base image to reduce container size and memory footprint.")
+            if 'RUN npm install' in content and 'npm ci' not in content:
+                tips.append("Use 'npm ci' instead of 'npm install' in Docker for reproducible and faster builds.")
+        except Exception:
+            pass
+        return tips
+
+    def _check_js_ts_config(self, root):
+        tips = []
+        for cfg in ['tsconfig.json', 'jsconfig.json']:
+            cfg_path = root / cfg
+            if cfg_path.exists():
+                try:
+                    data = json.loads(cfg_path.read_text(encoding='utf-8'))
+                    if data.get('compilerOptions', {}).get('target') == 'es5':
+                        tips.append("Targeting ES5 increases transpilation time and output size. Target modern JS (ES2017+) if supported.")
+                except Exception:
+                    pass
+        return tips
+
+    def _check_python_files(self, root):
+        tips = []
+        # Heuristic: check for common performance anti-patterns in .py files
+        for py_file in list(root.rglob('*.py'))[:10]:  # limit to 10 files for speed
+            try:
+                content = py_file.read_text(encoding='utf-8')
+                if 'for ' in content and 'range(' in content and 'append' in content:
+                    tips.append(f"In {py_file.name}, consider using list comprehensions or generator expressions instead of manual loops with append.")
+                if 'import pandas' in content and 'iterrows' in content:
+                    tips.append(f"In {py_file.name}, avoid df.iterrows(); use vectorized operations or itertuples() for speed.")
+                if 'open(' in content and 'read()' in content:
+                    tips.append(f"In {py_file.name}, reading entire file into memory may be wasteful; process files line by line.")
+            except Exception:
+                continue
+        return tips
+
+# ------------------- SUGGESTIONS -------------------
+def suggest(cpu, mem, disk, runtime, name, path, project_tips=None):
+    s = []
+    # Generic resource suggestions
+    if cpu > CPU_HIGH:
+        s.append("High CPU usage. Optimize loops, use efficient algorithms, or consider parallelizing.")
+    if mem > MEM_HIGH:
+        s.append(f"Using {mem:.0f}MB RAM. Check for memory leaks, use streaming instead of loading all data, or choose lighter data structures.")
+    if disk > DISK_HIGH:
+        s.append("Heavy disk I/O. Use caching, batch file operations, or switch to an SSD if possible.")
+    if runtime > LONG_RUN:
+        s.append("Long-running process. Profile your code to find bottlenecks, or consider asynchronous execution.")
+    # Developer tool‑specific advice
+    name_l = name.lower()
+    if name_l in ("code.exe", "devenv.exe"):
+        s.append("Visual Studio is resource‑heavy. Try VS Code with only necessary extensions for a lighter experience.")
+    elif name_l == "chrome.exe":
+        s.append("Chrome uses significant memory. Try Firefox or a tab‑suspension extension like Auto Tab Discard.")
+    elif name_l == "java.exe" or name_l == "javaw.exe":
+        s.append("Java process detected. Reduce heap size (-Xmx) if not needed, or use a lighter JVM like OpenJ9.")
+    elif name_l == "node.exe":
+        s.append("Node.js process. Avoid memory leaks by using proper garbage collection and avoid global variables.")
+    elif name_l == "python.exe":
+        s.append("Python process. Use PyPy for faster execution, or optimize with NumPy for numeric tasks.")
+    elif "android studio" in name_l or name_l == "studio64.exe":
+        s.append("Android Studio is heavy. Consider using a lighter editor like VS Code with Flutter/Dart plugins.")
+    elif name_l in ("cl.exe", "gcc.exe", "g++.exe", "rustc.exe"):
+        s.append("Compiler running. Use incremental builds, cache dependencies, or switch to a faster build system (e.g., Ninja).")
+    # Add project-specific tips
+    if project_tips:
+        s.extend(project_tips)
+    if not s:
+        s.append("Resource usage is normal. Good eco‑efficiency.")
+    return " ".join(s)
+
+# ------------------- MONITOR THREAD -------------------
+class Monitor(QThread):
+    snapshot = Signal(list)
+    alert = Signal(str)
+    finished_run = Signal(dict)
+
+    def __init__(self, db):
+        super().__init__()
+        self.db = db
+        self.running = True
+        self.procs = {}
+        self.analyzer = ProjectAnalyzer()
+
+    def stop(self):
+        self.running = False
+        self.wait()
+
+    def run(self):
+        while self.running:
+            try:
+                self._sample()
+            except Exception as e:
+                logging.error(f"Monitor error: {e}")
+            time.sleep(SAMPLE_INTERVAL)
+
+    def _sample(self):
+        current = set()
+        snap = []
+        for p in psutil.process_iter(['pid','name','exe','cpu_percent','memory_info','io_counters','create_time','cwd','cmdline']):
+            try:
+                info = p.info
+                pid = info['pid']
+                current.add(pid)
+                name = info['name']
+                cpu = info['cpu_percent']
+                mem = info['memory_info'].rss / (1024*1024)
+                disk = (info['io_counters'].read_bytes + info['io_counters'].write_bytes) if info['io_counters'] else 0
+                ct = info['create_time']
+                cwd = info.get('cwd') or None
+
+                if pid not in self.procs:
+                    self.procs[pid] = {
+                        'name': name, 'path': info['exe'], 'version': self._ver(info['exe']),
+                        'start': datetime.fromtimestamp(ct).isoformat(),
+                        'cpu': [], 'mem': [], 'disk': 0, 'max_cpu': cpu, 'max_mem': mem, 'last_disk': disk,
+                        'cwd': cwd
+                    }
+                else:
+                    t = self.procs[pid]
+                    t['cpu'].append(cpu)
+                    t['mem'].append(mem)
+                    t['max_cpu'] = max(t['max_cpu'], cpu)
+                    t['max_mem'] = max(t['max_mem'], mem)
+                    if disk > t['last_disk']:
+                        t['disk'] += disk - t['last_disk']
+                    t['last_disk'] = disk
+                    t['cwd'] = cwd  # update
+
+                t = self.procs[pid]
+                avg_cpu = sum(t['cpu'][-3:])/len(t['cpu'][-3:]) if t['cpu'] else cpu
+                avg_mem = sum(t['mem'][-3:])/len(t['mem'][-3:]) if t['mem'] else mem
+                sc = eco_score(avg_cpu, avg_mem, t['disk'], time.time()-ct)
+                heavy = cpu > CPU_HIGH or mem > MEM_HIGH
+                snap.append({'pid':pid,'name':name,'cpu':cpu,'mem':mem,'green_score':sc,'alert':heavy})
+                if heavy:
+                    self.alert.emit(f"{name} (PID {pid}) high resources.")
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+            except Exception as e:
+                logging.debug(f"Error pid {pid if 'pid' in locals() else '?'}: {e}")
+
+        # handle exited processes
+        for pid in set(self.procs) - current:
+            t = self.procs.pop(pid)
+            if not t['cpu']:
+                continue
+            cpu_avg = sum(t['cpu'])/len(t['cpu'])
+            mem_avg = sum(t['mem'])/len(t['mem'])
+            runtime = time.time() - datetime.fromisoformat(t['start']).timestamp()
+            sc = eco_score(cpu_avg, mem_avg, t['disk'], runtime)
+            # Get project tips
+            project_tips = self.analyzer.get_tips(t.get('cwd'), t['name'])
+            rec = suggest(cpu_avg, mem_avg, t['disk'], runtime, t['name'], t['path'], project_tips)
+            d = {
+                'name': t['name'], 'path': t['path'], 'version': t['version'],
+                'start_time': t['start'], 'end_time': datetime.now().isoformat(),
+                'total_runtime': runtime, 'cpu_avg': round(cpu_avg,2), 'cpu_max': t['max_cpu'],
+                'mem_avg': round(mem_avg,2), 'mem_max': t['max_mem'], 'disk_io': t['disk'],
+                'green_score': sc, 'recommendation': rec, 'timestamp': datetime.now().isoformat()
+            }
+            self.db.insert(d)
+            self.finished_run.emit(d)
+
+        self.snapshot.emit(snap)
+
+    def _ver(self, exe):
+        if not exe:
+            return ""
+        try:
+            import subprocess
+            r = subprocess.run(['wmic','datafile','where',f'name="{exe}"','get','Version','/value'],
+                               capture_output=True, text=True, timeout=2)
+            for line in r.stdout.splitlines():
+                if line.startswith('Version='):
+                    return line.split('=')[1].strip()
+        except:
+            pass
+        return ""
+
+# ------------------- UI MODELS -------------------
+class ProcModel(QAbstractTableModel):
+    def __init__(self):
+        super().__init__()
+        self.data_list = []
+        self.headers = ["PID","Name","CPU %","Mem MB","Green Score","Alert"]
+    def rowCount(self, parent): return len(self.data_list)
+    def columnCount(self, parent): return len(self.headers)
+    def data(self, idx, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole:
+            d = self.data_list[idx.row()]
+            col = idx.column()
+            return [d['pid'], d['name'], f"{d['cpu']:.1f}", f"{d['mem']:.1f}", f"{d['green_score']:.0f}", "⚠️" if d['alert'] else ""][col]
+    def headerData(self, sec, orient, role=Qt.DisplayRole):
+        if orient == Qt.Horizontal and role == Qt.DisplayRole:
+            return self.headers[sec]
+    def update(self, lst):
+        self.beginResetModel()
+        self.data_list = lst
+        self.endResetModel()
+
+class HistModel(QAbstractTableModel):
+    def __init__(self):
+        super().__init__()
+        self.data_list = []
+        self.headers = ["Name","Start","End","Runtime(s)","CPU Avg","Mem Avg","Score","Recommendation"]
+    def rowCount(self, parent): return len(self.data_list)
+    def columnCount(self, parent): return len(self.headers)
+    def data(self, idx, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole:
+            d = self.data_list[idx.row()]
+            col = idx.column()
+            return [d['name'], d['start_time'], d['end_time'], f"{d['total_runtime']:.1f}",
+                    f"{d['cpu_avg']:.1f}", f"{d['mem_avg']:.1f}", f"{d['green_score']:.0f}",
+                    d['recommendation']][col]
+    def headerData(self, sec, orient, role=Qt.DisplayRole):
+        if orient == Qt.Horizontal and role == Qt.DisplayRole:
+            return self.headers[sec]
+    def update(self, lst):
+        self.beginResetModel()
+        self.data_list = lst
+        self.endResetModel()
+
+# ------------------- TABS -------------------
+class Dashboard(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.table = QTableView()
+        self.model = ProcModel()
+        self.table.setModel(self.model)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QTableView.SelectRows)
+        self.table.setEditTriggers(QTableView.NoEditTriggers)
+        layout.addWidget(self.table)
+        self.setLayout(layout)
+    def update(self, data): self.model.update(data)
+
+class History(QWidget):
+    def __init__(self, db):
+        super().__init__()
+        self.db = db
+        layout = QVBoxLayout()
+        self.table = QTableView()
+        self.model = HistModel()
+        self.table.setModel(self.model)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.setSelectionBehavior(QTableView.SelectRows)
+        self.table.setEditTriggers(QTableView.NoEditTriggers)
+        layout.addWidget(self.table)
+        btns = QHBoxLayout()
+        csv_btn = QPushButton("Export CSV"); csv_btn.clicked.connect(self.export_csv)
+        json_btn = QPushButton("Export JSON"); json_btn.clicked.connect(self.export_json)
+        refresh = QPushButton("Refresh"); refresh.clicked.connect(self.refresh)
+        btns.addWidget(csv_btn); btns.addWidget(json_btn); btns.addWidget(refresh); btns.addStretch()
+        layout.addLayout(btns)
+        self.setLayout(layout)
+        self.refresh()
+    def refresh(self): self.model.update(self.db.all(100))
+    def export_csv(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export CSV", "ecodev.csv", "CSV (*.csv)")
+        if path:
+            rows = self.db.all(1000)
+            if rows:
+                with open(path,'w',newline='',encoding='utf-8') as f:
+                    w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+                    w.writeheader()
+                    w.writerows(rows)
+                QMessageBox.information(self,"Export",f"Exported {len(rows)} rows")
+    def export_json(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export JSON", "ecodev.json", "JSON (*.json)")
+        if path:
+            rows = self.db.all(1000)
+            with open(path,'w',encoding='utf-8') as f:
+                json.dump(rows, f, indent=2)
+            QMessageBox.information(self,"Export",f"Exported {len(rows)} rows")
+
+class Suggestions(QWidget):
+    def __init__(self):
+        super().__init__()
+        layout = QVBoxLayout()
+        self.label = QLabel("Suggestions from recent runs:")
+        self.list = QListWidget()
+        layout.addWidget(self.label)
+        layout.addWidget(self.list)
+        self.setLayout(layout)
+    def add(self, d):
+        self.list.insertItem(0, f"{d['name']} (Score {d['green_score']:.0f}): {d['recommendation']}")
+        while self.list.count() > 50:
+            self.list.takeItem(self.list.count()-1)
+
+# ------------------- MAIN WINDOW -------------------
+class MainWindow(QMainWindow):
+    def __init__(self, db, monitor):
+        super().__init__()
+        self.db = db
+        self.monitor = monitor
+        self.setWindowTitle("EcoDev: Smart Code Analyzer")
+        self.resize(1000,700)
+        self.tabs = QTabWidget()
+        self.dash = Dashboard()
+        self.hist = History(db)
+        self.sugg = Suggestions()
+        self.tabs.addTab(self.dash,"Dashboard")
+        self.tabs.addTab(self.hist,"History")
+        self.tabs.addTab(self.sugg,"Suggestions")
+        self.setCentralWidget(self.tabs)
+
+        self.tray = QSystemTrayIcon(self)
+        self.tray.setIcon(QIcon.fromTheme("utilities-system-monitor"))
+        self.tray.setToolTip("EcoDev")
+        menu = QMenu()
+        show = QAction("Show", self); show.triggered.connect(self.show_win)
+        menu.addAction(show)
+        exit_a = QAction("Exit", self); exit_a.triggered.connect(self.exit_app)
+        menu.addAction(exit_a)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(lambda r: self.show_win() if r==QSystemTrayIcon.Trigger else None)
+        self.tray.show()
+
+        self.monitor.snapshot.connect(self.dash.update)
+        self.monitor.alert.connect(self.alert)
+        self.monitor.finished_run.connect(self.hist.refresh)
+        self.monitor.finished_run.connect(self.sugg.add)
+        self.monitor.start()
+        self.hist.refresh()
+        self.statusBar().showMessage("Monitoring started. Close window to hide to tray.")
+
+    def show_win(self):
+        self.showNormal(); self.raise_(); self.activateWindow()
+    def alert(self, msg):
+        self.tray.showMessage("EcoDev Alert", msg)
+        self.statusBar().showMessage(msg, 5000)
+    def exit_app(self):
+        self.monitor.stop()
+        self.db.close()
+        QApplication.quit()
+    def closeEvent(self, e):
+        e.ignore()
+        self.hide()
+        self.tray.showMessage("EcoDev","Running in background.")
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setQuitOnLastWindowClosed(False)
+    db = Database()
+    mon = Monitor(db)
+    win = MainWindow(db, mon)
+    win.show()
+    sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()

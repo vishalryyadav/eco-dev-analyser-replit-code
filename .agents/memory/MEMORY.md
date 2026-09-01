@@ -1,0 +1,1 @@
+- [Browser monitoring boundary](browser-monitoring-boundary.md) — device-wide process and VS Code monitoring requires a local companion or extension.
