@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowUpRight,
   BarChart3,
+  Battery,
   BookOpen,
   Check,
   CircleHelp,
@@ -18,6 +19,7 @@ import {
   Leaf,
   LineChart,
   Menu,
+  MonitorOff,
   Moon,
   MoreHorizontal,
   Play,
@@ -28,6 +30,8 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sparkles,
+  SunDim,
+  Timer,
   Trash2,
   X,
   Zap,
@@ -66,6 +70,19 @@ type MonitorSample = {
 };
 
 type OptimizationGoal = 'balanced' | 'speed' | 'memory' | 'reliability' | 'scale' | 'security';
+type EnergyPlan = 'balanced' | 'battery' | 'maximum';
+
+type EcoSettings = {
+  monitoring: boolean;
+  autoSave: boolean;
+  threshold: number;
+  energyPlan: EnergyPlan;
+  dimScreen: boolean;
+  batterySaver: boolean;
+  reducedMotion: boolean;
+  screenTimeout: string;
+  keyboardBacklight: boolean;
+};
 
 type ResearchNote = {
   title: string;
@@ -78,6 +95,24 @@ type ResearchNote = {
 const queryClient = new QueryClient();
 const storageKey = 'ecodev-analyses';
 const settingsKey = 'ecodev-settings';
+
+const defaultSettings: EcoSettings = {
+  monitoring: true,
+  autoSave: true,
+  threshold: 80,
+  energyPlan: 'balanced',
+  dimScreen: true,
+  batterySaver: true,
+  reducedMotion: false,
+  screenTimeout: '10',
+  keyboardBacklight: true,
+};
+
+const energyPlans: { value: EnergyPlan; label: string; detail: string }[] = [
+  { value: 'balanced', label: 'Balanced', detail: 'Good battery life without slowing your work' },
+  { value: 'battery', label: 'Battery saver', detail: 'Fewer background samples and gentler visuals' },
+  { value: 'maximum', label: 'Maximum saving', detail: 'Best for travel, meetings, or low battery' },
+];
 
 const starterCode = `function uniqueItems(items) {
   const result = [];
@@ -230,6 +265,15 @@ function writeAnalyses(analyses: Analysis[]) {
   localStorage.setItem(storageKey, JSON.stringify(analyses));
 }
 
+function getSettings(): EcoSettings {
+  try {
+    const stored = JSON.parse(localStorage.getItem(settingsKey) || '{}') as Partial<EcoSettings>;
+    return { ...defaultSettings, ...stored };
+  } catch {
+    return defaultSettings;
+  }
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
 }
@@ -330,6 +374,7 @@ function ScoreRing({ score, size = 'large' }: { score: number; size?: 'large' | 
 
 function Overview() {
   const analyses = getAnalyses();
+  const settings = getSettings();
   const average = Math.round(analyses.reduce((sum, item) => sum + item.score, 0) / analyses.length);
   const averageCpu = Math.round(monitorSamples.reduce((sum, sample) => sum + sample.cpu, 0) / monitorSamples.length);
   const forecastLabel = averageCpu > 35 ? 'Watch capacity' : 'Stable capacity';
@@ -349,7 +394,22 @@ function Overview() {
     </div>
        <section className="mt-5 rounded-2xl border border-[#cfe6a2] bg-[#f1f7df] p-5 dark:border-[#385c3f] dark:bg-[#1d3825] md:p-6"><div className="flex gap-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d9ef9b] text-[#376b42] dark:bg-[#365c3d] dark:text-[#c6ed51]"><Sparkles size={17} /></span><div><p className="text-[12px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">A useful next move</p><p className="mt-1 max-w-[680px] text-[12px] leading-relaxed text-[#55725c] dark:text-[#a5b9a3]">Run the analyzer on a hot path before optimizing your next feature. One measured improvement beats a dozen assumptions.</p><Link href="/analyzer" data-testid="link-next-analysis" className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-[#2c7045] hover:underline dark:text-[#c6ed51]">Open analyzer <ArrowUpRight size={12} /></Link></div></div></section>
        <section className="mt-5 rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6" data-testid="card-capacity-forecast"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="mono mb-2 text-[10px] uppercase tracking-[.17em] text-primary">Capacity forecast</div><h2 className="text-[17px] font-extrabold tracking-[-.04em]">{forecastLabel}</h2><p className="mt-1 max-w-[680px] text-[11px] leading-relaxed text-muted-foreground">{forecastDetail}</p></div><span className={`rounded-full px-2.5 py-1 mono text-[9px] uppercase tracking-[.1em] ${averageCpu > 35 ? 'bg-[#4c3920] text-[#efc777]' : 'bg-secondary text-primary'}`} data-testid="status-capacity-forecast">Next 30 min · {averageCpu}% avg CPU</span></div><div className="mt-5 grid gap-3 sm:grid-cols-3"><ForecastStat label="Compute headroom" value={averageCpu > 35 ? '62%' : '78%'} detail="Estimated available" /><ForecastStat label="Energy direction" value={averageCpu > 35 ? 'Rising' : 'Steady'} detail="Based on recent samples" /><ForecastStat label="Next action" value={averageCpu > 35 ? 'Profile' : 'Measure'} detail="Before changing code" /></div></section>
-  </div>;
+       <EnergyPosture settings={settings} />
+    </div>;
+}
+
+function EnergyPosture({ settings }: { settings: EcoSettings }) {
+  const plan = energyPlans.find((item) => item.value === settings.energyPlan) ?? energyPlans[0];
+  return <section className="mt-5 rounded-2xl border border-[#cfe6a2] bg-[#f1f7df] p-5 shadow-sm dark:border-[#385c3f] dark:bg-[#1d3825] md:p-6" data-testid="card-energy-posture">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d9ef9b] text-[#376b42] dark:bg-[#365c3d] dark:text-[#c6ed51]"><Battery size={17} /></span>
+        <div><div className="mono mb-1 text-[10px] uppercase tracking-[.17em] text-[#4e784b] dark:text-[#c6ed51]">Energy posture</div><h2 className="text-[16px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">{plan.label} plan is ready</h2><p className="mt-1 max-w-[640px] text-[11px] leading-relaxed text-[#55725c] dark:text-[#a5b9a3]">Use a shorter screen timeout, lower brightness, and fewer background tasks to keep the laptop cooler and extend battery life.</p></div>
+      </div>
+      <Link href="/settings" data-testid="link-energy-settings" className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2c7045] hover:underline dark:text-[#c6ed51]">Tune energy settings <ArrowUpRight size={12} /></Link>
+    </div>
+    <div className="mt-5 grid gap-3 sm:grid-cols-3"><ForecastStat label="Screen off" value={`${settings.screenTimeout} min`} detail={settings.dimScreen ? 'Dim when idle' : 'Brightness unchanged'} /><ForecastStat label="Background work" value={settings.batterySaver ? 'Reduced' : 'Normal'} detail={settings.monitoring ? 'Monitoring ready' : 'Monitoring paused'} /><ForecastStat label="Motion" value={settings.reducedMotion ? 'Reduced' : 'Normal'} detail="EcoDev interface" /></div>
+  </section>;
 }
 
 function ForecastStat({ label, value, detail }: { label: string; value: string; detail: string }) {
@@ -530,23 +590,46 @@ function ResearchCard({ note, index }: { note: ResearchNote; index: number }) {
 }
 
 function Settings() {
-  const [monitoring, setMonitoring] = useState(true);
-  const [autoSave, setAutoSave] = useState(true);
-  const [threshold, setThreshold] = useState(80);
+  const [monitoring, setMonitoring] = useState(defaultSettings.monitoring);
+  const [autoSave, setAutoSave] = useState(defaultSettings.autoSave);
+  const [threshold, setThreshold] = useState(defaultSettings.threshold);
+  const [energyPlan, setEnergyPlan] = useState<EnergyPlan>(defaultSettings.energyPlan);
+  const [dimScreen, setDimScreen] = useState(defaultSettings.dimScreen);
+  const [batterySaver, setBatterySaver] = useState(defaultSettings.batterySaver);
+  const [reducedMotion, setReducedMotion] = useState(defaultSettings.reducedMotion);
+  const [screenTimeout, setScreenTimeout] = useState(defaultSettings.screenTimeout);
+  const [keyboardBacklight, setKeyboardBacklight] = useState(defaultSettings.keyboardBacklight);
   const [notice, setNotice] = useState('');
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(settingsKey) || '{}') as { monitoring?: boolean; autoSave?: boolean; threshold?: number };
-      if (typeof stored.monitoring === 'boolean') setMonitoring(stored.monitoring);
-      if (typeof stored.autoSave === 'boolean') setAutoSave(stored.autoSave);
-      if (stored.threshold) setThreshold(stored.threshold);
-    } catch { /* use defaults */ }
+    const stored = getSettings();
+    setMonitoring(stored.monitoring);
+    setAutoSave(stored.autoSave);
+    setThreshold(stored.threshold);
+    setEnergyPlan(stored.energyPlan);
+    setDimScreen(stored.dimScreen);
+    setBatterySaver(stored.batterySaver);
+    setReducedMotion(stored.reducedMotion);
+    setScreenTimeout(stored.screenTimeout);
+    setKeyboardBacklight(stored.keyboardBacklight);
   }, []);
-  function saveSettings(next: Partial<{ monitoring: boolean; autoSave: boolean; threshold: number }>) {
-    const value = { monitoring, autoSave, threshold, ...next };
+  useEffect(() => {
+    document.documentElement.classList.toggle('reduce-motion', reducedMotion);
+  }, [reducedMotion]);
+  function saveSettings(next: Partial<EcoSettings>) {
+    const value: EcoSettings = { monitoring, autoSave, threshold, energyPlan, dimScreen, batterySaver, reducedMotion, screenTimeout, keyboardBacklight, ...next };
     localStorage.setItem(settingsKey, JSON.stringify(value));
     setNotice('Settings updated');
     setTimeout(() => setNotice(''), 1900);
+  }
+  function applyEnergyDefaults() {
+    const next: Partial<EcoSettings> = { energyPlan: 'battery', dimScreen: true, batterySaver: true, reducedMotion: true, screenTimeout: '5', keyboardBacklight: true };
+    setEnergyPlan('battery');
+    setDimScreen(true);
+    setBatterySaver(true);
+    setReducedMotion(true);
+    setScreenTimeout('5');
+    setKeyboardBacklight(true);
+    saveSettings(next);
   }
   function copyVscodeBrief() {
     const brief = 'EcoDev VS Code companion: send the active file, language, compile status, and optional benchmark results to the local analyzer. Never upload source code.';
@@ -557,7 +640,8 @@ function Settings() {
   function resetData() {
     localStorage.removeItem(storageKey);
     localStorage.removeItem(settingsKey);
-    setMonitoring(true); setAutoSave(true); setThreshold(80);
+    setMonitoring(defaultSettings.monitoring); setAutoSave(defaultSettings.autoSave); setThreshold(defaultSettings.threshold);
+    setEnergyPlan(defaultSettings.energyPlan); setDimScreen(defaultSettings.dimScreen); setBatterySaver(defaultSettings.batterySaver); setReducedMotion(defaultSettings.reducedMotion); setScreenTimeout(defaultSettings.screenTimeout); setKeyboardBacklight(defaultSettings.keyboardBacklight);
     setNotice('Local data reset to demo state');
     setTimeout(() => setNotice(''), 2200);
   }
@@ -569,8 +653,9 @@ function Settings() {
         <div className="space-y-1"><ToggleRow title="Enable local monitoring" detail="Keep the monitoring surface ready for a permitted desktop companion." checked={monitoring} onChange={(checked) => { setMonitoring(checked); saveSettings({ monitoring: checked }); }} testId="toggle-monitoring" /><ToggleRow title="Save analyzer results automatically" detail="Keep completed readouts in local history unless you remove them." checked={autoSave} onChange={(checked) => { setAutoSave(checked); saveSettings({ autoSave: checked }); }} testId="toggle-autosave" /></div>
         <div className="mt-7 border-t border-border pt-6"><div className="flex items-center justify-between"><div><h3 className="text-[13px] font-extrabold">Efficiency threshold</h3><p className="mt-1 text-[11px] text-muted-foreground">Flag scores below this number for another look.</p></div><span className="mono text-[17px] font-medium text-primary" data-testid="text-threshold-value">{threshold}</span></div><input type="range" min="50" max="95" value={threshold} onChange={(event) => { const value = Number(event.target.value); setThreshold(value); saveSettings({ threshold: value }); }} className="mt-5 w-full accent-[#2c7a4b]" data-testid="input-threshold" /><div className="mt-2 flex justify-between mono text-[9px] text-muted-foreground"><span>50 / flexible</span><span>95 / strict</span></div></div>
       </section>
-      <section className="space-y-5">
-        <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary"><ShieldCheck size={17} /></span><div><h2 className="text-[14px] font-extrabold">Privacy posture</h2><p className="mt-1 text-[10px] text-muted-foreground">Ready for local-first work</p></div></div><div className="space-y-3 text-[11px]"><StatusLine label="Code uploads" value="Never" /><StatusLine label="Data storage" value="This browser" /><StatusLine label="Monitoring" value={monitoring ? 'Preview ready' : 'Paused'} /></div></div>
+       <section className="space-y-5">
+         <EnergySaver energyPlan={energyPlan} setEnergyPlan={setEnergyPlan} dimScreen={dimScreen} setDimScreen={setDimScreen} batterySaver={batterySaver} setBatterySaver={setBatterySaver} reducedMotion={reducedMotion} setReducedMotion={setReducedMotion} screenTimeout={screenTimeout} setScreenTimeout={setScreenTimeout} keyboardBacklight={keyboardBacklight} setKeyboardBacklight={setKeyboardBacklight} saveSettings={saveSettings} applyEnergyDefaults={applyEnergyDefaults} />
+         <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6"><div className="mb-5 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary"><ShieldCheck size={17} /></span><div><h2 className="text-[14px] font-extrabold">Privacy posture</h2><p className="mt-1 text-[10px] text-muted-foreground">Ready for local-first work</p></div></div><div className="space-y-3 text-[11px]"><StatusLine label="Code uploads" value="Never" /><StatusLine label="Data storage" value="This browser" /><StatusLine label="Monitoring" value={monitoring ? 'Preview ready' : 'Paused'} /></div></div>
         <div className="rounded-2xl border border-card-border bg-card p-5 shadow-sm md:p-6" data-testid="panel-vscode-companion"><div className="mb-4 flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary"><Code2 size={17} /></span><div><h2 className="text-[14px] font-extrabold">VS Code companion</h2><p className="mt-1 text-[10px] text-muted-foreground">A clear handoff for editor integration</p></div></div><div className="rounded-xl bg-muted/70 p-3"><div className="flex items-center justify-between gap-3"><span className="mono text-[9px] uppercase tracking-[.1em] text-muted-foreground">Connection</span><span className="flex items-center gap-1.5 text-[10px] font-bold text-[#c38b3c]"><span className="h-1.5 w-1.5 rounded-full bg-[#c38b3c]" /> Not connected</span></div><p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">When added, the companion can send active-file context and compile events locally. It should never send source code to a remote service.</p></div><button onClick={copyVscodeBrief} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-input px-3 py-2 text-[11px] font-bold hover:bg-muted" data-testid="button-copy-vscode-brief"><Clipboard size={13} /> Copy setup brief</button></div>
         <div className="rounded-2xl border border-[#e4c9bf] bg-[#fff7f2] p-5 dark:border-[#5c352f] dark:bg-[#2d1d1b] md:p-6"><div className="flex gap-3"><Trash2 size={16} className="mt-0.5 shrink-0 text-[#a75a43]" /><div><h2 className="text-[13px] font-extrabold text-[#704335] dark:text-[#f2b3a7]">Local data controls</h2><p className="mt-1 text-[11px] leading-relaxed text-[#936653] dark:text-[#d69a8c]">Reset saved analyses and preferences back to the demo state. This cannot be undone.</p><button onClick={resetData} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#ddb7a9] px-3 py-2 text-[11px] font-bold text-[#8f4d3d] hover:bg-[#fbe8df] dark:border-[#704137] dark:text-[#f2b3a7] dark:hover:bg-[#442521]" data-testid="button-reset-data"><RotateCcw size={13} /> Reset local data</button></div></div></div>
       </section>
@@ -578,8 +663,49 @@ function Settings() {
   </div>;
 }
 
-function ToggleRow({ title, detail, checked, onChange, testId }: { title: string; detail: string; checked: boolean; onChange: (value: boolean) => void; testId: string }) {
-  return <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-4"><div><p className="text-[12px] font-extrabold">{title}</p><p className="mt-1 max-w-[410px] text-[11px] leading-relaxed text-muted-foreground">{detail}</p></div><button role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full p-1 transition-colors ${checked ? 'bg-primary' : 'bg-muted'}`} data-testid={testId}><span className={`block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} /></button></div>;
+function EnergySaver({ energyPlan, setEnergyPlan, dimScreen, setDimScreen, batterySaver, setBatterySaver, reducedMotion, setReducedMotion, screenTimeout, setScreenTimeout, keyboardBacklight, setKeyboardBacklight, saveSettings, applyEnergyDefaults }: {
+  energyPlan: EnergyPlan;
+  setEnergyPlan: (value: EnergyPlan) => void;
+  dimScreen: boolean;
+  setDimScreen: (value: boolean) => void;
+  batterySaver: boolean;
+  setBatterySaver: (value: boolean) => void;
+  reducedMotion: boolean;
+  setReducedMotion: (value: boolean) => void;
+  screenTimeout: string;
+  setScreenTimeout: (value: string) => void;
+  keyboardBacklight: boolean;
+  setKeyboardBacklight: (value: boolean) => void;
+  saveSettings: (next: Partial<EcoSettings>) => void;
+  applyEnergyDefaults: () => void;
+}) {
+  const plan = energyPlans.find((item) => item.value === energyPlan) ?? energyPlans[0];
+  return <section className="rounded-2xl border border-[#b8d77e] bg-[#f1f7df] p-5 shadow-sm dark:border-[#385c3f] dark:bg-[#1d3825] md:p-6" data-testid="panel-energy-saver">
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#d9ef9b] text-[#376b42] dark:bg-[#365c3d] dark:text-[#c6ed51]"><Battery size={17} /></span><div><div className="mono mb-1 text-[10px] uppercase tracking-[.14em] text-[#4e784b] dark:text-[#c6ed51]">Laptop basics</div><h2 className="text-[15px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">Energy saver</h2><p className="mt-1 text-[11px] leading-relaxed text-[#55725c] dark:text-[#a5b9a3]">Simple power habits for a cooler laptop, longer battery life, and lower energy use.</p></div></div>
+      <span className="rounded-full bg-[#d9ef9b] px-2 py-1 mono text-[9px] font-medium uppercase tracking-[.1em] text-[#376b42] dark:bg-[#365c3d] dark:text-[#c6ed51]">Local</span>
+    </div>
+    <div className="mt-5 rounded-xl border border-[#cfe6a2] bg-white/45 p-3 dark:border-[#385c3f] dark:bg-[#12291b]">
+      <label htmlFor="energy-plan" className="flex items-center justify-between gap-3"><span><span className="block text-[12px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">Energy plan</span><span className="mt-1 block text-[10px] text-[#55725c] dark:text-[#a5b9a3]">{plan.detail}</span></span><select id="energy-plan" value={energyPlan} onChange={(event) => { const value = event.target.value as EnergyPlan; setEnergyPlan(value); saveSettings({ energyPlan: value }); }} className="h-9 rounded-lg border border-[#b8d77e] bg-[#f8fbe9] px-2 text-[11px] font-bold text-[#315b3d] outline-none focus:ring-2 focus:ring-[#7fac40] dark:border-[#4f7550] dark:bg-[#203c29] dark:text-[#d8e8cc]" data-testid="select-energy-plan"><option value="balanced">Balanced</option><option value="battery">Battery saver</option><option value="maximum">Maximum saving</option></select></label>
+    </div>
+    <div className="mt-3 divide-y divide-[#cfe6a2] dark:divide-[#385c3f]">
+      <ToggleRow title="Dim screen while EcoDev is idle" detail="Recommended OS action: lower brightness to about 40–60% when you step away." checked={dimScreen} onChange={(checked) => { setDimScreen(checked); saveSettings({ dimScreen: checked }); }} testId="toggle-dim-screen" tone="energy" />
+      <ToggleRow title="Use battery saver during analysis" detail="Keep background work lighter while you are on battery. This app cannot change the laptop power mode itself." checked={batterySaver} onChange={(checked) => { setBatterySaver(checked); saveSettings({ batterySaver: checked }); }} testId="toggle-battery-saver" tone="energy" />
+      <ToggleRow title="Reduce EcoDev motion and refresh" detail="Use fewer visual transitions and gentler updates to reduce browser work." checked={reducedMotion} onChange={(checked) => { setReducedMotion(checked); saveSettings({ reducedMotion: checked }); }} testId="toggle-reduced-motion" tone="energy" />
+      <ToggleRow title="Turn off keyboard backlight when idle" detail="Recommended OS action for laptops with a backlit keyboard." checked={keyboardBacklight} onChange={(checked) => { setKeyboardBacklight(checked); saveSettings({ keyboardBacklight: checked }); }} testId="toggle-keyboard-backlight" tone="energy" />
+    </div>
+    <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#cfe6a2] pt-4 dark:border-[#385c3f]"><label htmlFor="screen-timeout" className="flex items-center gap-2 text-[11px] font-bold text-[#315b3d] dark:text-[#d8e8cc]"><Timer size={15} /> Automatic screen off</label><select id="screen-timeout" value={screenTimeout} onChange={(event) => { const value = event.target.value; setScreenTimeout(value); saveSettings({ screenTimeout: value }); }} className="h-8 rounded-lg border border-[#b8d77e] bg-[#f8fbe9] px-2 text-[11px] font-bold text-[#315b3d] outline-none focus:ring-2 focus:ring-[#7fac40] dark:border-[#4f7550] dark:bg-[#203c29] dark:text-[#d8e8cc]" data-testid="select-screen-timeout"><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option></select></div>
+    <button onClick={applyEnergyDefaults} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-[#315b3d] px-3 py-2 text-[11px] font-bold text-[#f1f7df] transition-colors hover:bg-[#24492f] dark:bg-[#c6ed51] dark:text-[#183d2a] dark:hover:bg-[#d4f572]" data-testid="button-apply-energy-defaults"><Zap size={13} /> Apply low-power defaults</button>
+    <div className="mt-5 border-t border-[#cfe6a2] pt-4 dark:border-[#385c3f]"><div className="mb-3 flex items-center gap-2"><SunDim size={15} className="text-[#4e784b] dark:text-[#c6ed51]" /><h3 className="text-[11px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">Recommended laptop basics</h3></div><div className="grid gap-2 sm:grid-cols-2"><PowerGuideItem icon={<MonitorOff size={14} />} title="Display & sleep" detail={`Set screen off to ${screenTimeout}–10 minutes`} /><PowerGuideItem icon={<SunDim size={14} />} title="Brightness" detail="Use 40–60% when indoors" /><PowerGuideItem icon={<Battery size={14} />} title="Battery saver" detail="Turn on below 30% battery" /><PowerGuideItem icon={<Zap size={14} />} title="Background apps" detail="Close unused tabs and startup apps" /></div><p className="mt-3 text-[10px] leading-relaxed text-[#55725c] dark:text-[#a5b9a3]">Windows: Settings → System → Power & battery → Screen and sleep. macOS and Linux have the same controls under Power or Energy Saver.</p></div>
+  </section>;
+}
+
+function PowerGuideItem({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
+  return <div className="flex items-start gap-2 rounded-lg bg-white/45 p-2.5 dark:bg-[#12291b]"><span className="mt-0.5 text-[#4e784b] dark:text-[#c6ed51]">{icon}</span><div><p className="text-[10px] font-extrabold text-[#315b3d] dark:text-[#d8e8cc]">{title}</p><p className="mt-0.5 text-[9px] leading-relaxed text-[#55725c] dark:text-[#a5b9a3]">{detail}</p></div></div>;
+}
+
+function ToggleRow({ title, detail, checked, onChange, testId, tone = 'default' }: { title: string; detail: string; checked: boolean; onChange: (value: boolean) => void; testId: string; tone?: 'default' | 'energy' }) {
+  return <div className={`flex items-center justify-between gap-4 rounded-xl px-2 py-4 ${tone === 'energy' ? 'text-[#315b3d] dark:text-[#d8e8cc]' : ''}`}><div><p className="text-[12px] font-extrabold">{title}</p><p className={`mt-1 max-w-[410px] text-[11px] leading-relaxed ${tone === 'energy' ? 'text-[#55725c] dark:text-[#a5b9a3]' : 'text-muted-foreground'}`}>{detail}</p></div><button role="switch" aria-label={title} aria-checked={checked} onClick={() => onChange(!checked)} className={`relative h-6 w-11 shrink-0 rounded-full p-1 transition-colors ${checked ? 'bg-primary' : 'bg-muted'}`} data-testid={testId}><span className={`block h-4 w-4 rounded-full bg-background shadow-sm transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} /></button></div>;
 }
 
 function StatusLine({ label, value }: { label: string; value: string }) {
