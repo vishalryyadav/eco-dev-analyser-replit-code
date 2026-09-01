@@ -14,3 +14,17 @@ mtime_ms = 1788257495103
 storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:feb746f0-d4c6-4128-aa9e-e3e405b01986/fd40da6d-060e-4a9d-986c-4e04a42a6889/77cf15c2-e17a-4c54-8e40-f527c3cfe487"
 storage_version_token = "1788257504599039"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "r7ugbleyHzMbX1h62vQXq"
+uri = "file://exports/ecodev_synopsis_vishal_radheshyam_yadav_2619064.pdf"
+type = "pdf"
+title = "Synopsis - Vishal Radheshyam Yadav"
+description = "Reference-style two-page synopsis PDF with acknowledgement, boxed Synopsis heading, project details, purpose points, and bibliography."
+logical_id = "9bf99e81-dd1a-46b5-9781-e1c527fd86cf"
+content_hash = "sha256:dcb6140764c7a8a59411c9eab5a6a071096e28a831177b6d2c391e1f42b403bb"
+size = 7420
+mtime_ms = 1788257842781
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:feb746f0-d4c6-4128-aa9e-e3e405b01986/9bf99e81-dd1a-46b5-9781-e1c527fd86cf/487de2cc-5503-4aee-8018-07ef0a7374cc"
+storage_version_token = "1788257850003060"
+content_type = "application/pdf"

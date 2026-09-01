@@ -1,0 +1,119 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Oblique >>
+endobj
+4 0 obj
+<< /Length 1561 >>
+stream
+q 1.000 1.000 1.000 RG 0.0 w 0.0 0.0 595.0 842.0 re S Q
+BT /F3 8.0 Tf 0.400 0.400 0.400 rg 258.0 779.0 Td (EcoDev) Tj ET
+BT /F2 17.0 Tf 0.030 0.030 0.030 rg 230.0 705.0 Td (ACKNOWLEDGEMENT) Tj ET
+q 0.030 0.030 0.030 RG 0.7 w 190.0 694.0 m 405.0 694.0 l S Q
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 625.0 Td (I would like to express my sincere gratitude to my teachers and) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 607.0 Td (institution for providing valuable guidance and encouragement) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 589.0 Td (during the preparation of this project synopsis. Their support) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 571.0 Td (helped me understand the importance of efficient, responsible, and) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 553.0 Td (sustainable software development.) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 517.0 Td (I am also thankful to my parents, family members, and friends for) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 499.0 Td (their continuous support and motivation. Their encouragement helped) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 481.0 Td (me complete this project work with interest and dedication.) Tj ET
+BT /F1 11.0 Tf 0.030 0.030 0.030 rg 88.0 439.0 Td (Thank you to everyone who directly or indirectly helped me complete this project.) Tj ET
+q 0.750 0.750 0.750 RG 0.3 w 70.0 45.0 m 525.0 45.0 l S Q
+BT /F1 8.0 Tf 0.400 0.400 0.400 rg 70.0 29.0 Td (Vishal Radheshyam Yadav | Roll no.: 2619064) Tj ET
+BT /F1 8.0 Tf 0.400 0.400 0.400 rg 510.0 29.0 Td (1) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 4847 >>
+stream
+q 1.000 1.000 1.000 RG 0.0 w 0.0 0.0 595.0 842.0 re S Q
+BT /F3 7.5 Tf 0.400 0.400 0.400 rg 436.0 779.0 Td (EcoDev Code Analyzer) Tj ET
+q 0.030 0.030 0.030 RG 0.9 w 188.0 723.0 219.0 38.0 re S Q
+BT /F2 17.0 Tf 0.030 0.030 0.030 rg 243.0 736.0 Td (Synopsis) Tj ET
+BT /F2 10.5 Tf 0.030 0.030 0.030 rg 70.0 682.0 Td (Title of the project:-) Tj ET
+BT /F1 10.5 Tf 0.030 0.030 0.030 rg 88.0 660.0 Td (EcoDev: Green Code Analyzer and Laptop Energy Saver) Tj ET
+BT /F2 10.5 Tf 0.030 0.030 0.030 rg 70.0 632.0 Td (Members of the project: - Name:-) Tj ET
+BT /F1 10.5 Tf 0.030 0.030 0.030 rg 285.0 632.0 Td (Vishal Radheshyam Yadav) Tj ET
+BT /F1 10.5 Tf 0.030 0.030 0.030 rg 238.0 607.0 Td (Roll no:- 2619064) Tj ET
+BT /F2 10.5 Tf 0.030 0.030 0.030 rg 70.0 570.0 Td (Purpose of the project:-) Tj ET
+BT /F2 11.0 Tf 0.030 0.030 0.030 rg 71.0 547.0 Td (ï) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 547.0 Td (To analyze code complexity, runtime, and memory use in JavaScript,) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 534.0 Td (TypeScript, Python, Go, and C programs.) Tj ET
+BT /F2 11.0 Tf 0.030 0.030 0.030 rg 71.0 514.0 Td (ï) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 514.0 Td (To give practical recommendations based on the developer's priority,) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 501.0 Td (such as speed, limited memory, reliability, scalability, security,) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 488.0 Td (and bug-resistant design.) Tj ET
+BT /F2 11.0 Tf 0.030 0.030 0.030 rg 71.0 468.0 Td (ï) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 468.0 Td (To promote green computing by reducing unnecessary CPU work, memory) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 455.0 Td (movement, repeated processing, and background activity.) Tj ET
+BT /F2 11.0 Tf 0.030 0.030 0.030 rg 71.0 435.0 Td (ï) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 435.0 Td (To forecast laptop and resource usage so developers can identify) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 422.0 Td (rising workload, capacity, and energy demand early.) Tj ET
+BT /F2 11.0 Tf 0.030 0.030 0.030 rg 71.0 402.0 Td (ï) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 402.0 Td (To encourage simple laptop energy-saving habits such as automatic) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 389.0 Td (screen-off, lower brightness, battery saver, fewer background) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 376.0 Td (applications, and keyboard-backlight control.) Tj ET
+BT /F2 11.0 Tf 0.030 0.030 0.030 rg 71.0 356.0 Td (ï) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 356.0 Td (To keep analysis local by default and provide a future path for a) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 343.0 Td (permission-based desktop companion and VS Code integration without) Tj ET
+BT /F1 9.5 Tf 0.030 0.030 0.030 rg 87.0 330.0 Td (uploading source code.) Tj ET
+BT /F2 10.5 Tf 0.030 0.030 0.030 rg 70.0 308.0 Td (Bibliography:-) Tj ET
+BT /F2 8.7 Tf 0.030 0.030 0.030 rg 70.0 288.0 Td (1.) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 288.0 Td (Green Software Foundation - Green Software Principles.) Tj ET
+BT /F3 8.0 Tf 0.080 0.250 0.520 rg 84.0 278.0 Td (https://principles.green/) Tj ET
+BT /F2 8.7 Tf 0.030 0.030 0.030 rg 70.0 264.5 Td (2.) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 264.5 Td (International Energy Agency - Data centres and data transmission) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 254.5 Td (networks.) Tj ET
+BT /F3 8.0 Tf 0.080 0.250 0.520 rg 84.0 244.5 Td (https://www.iea.org/reports/electricity-2024/data-centres-and-data-transmission-networks) Tj ET
+BT /F2 8.7 Tf 0.030 0.030 0.030 rg 70.0 231.0 Td (3.) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 231.0 Td (Barroso, L. A. and Hˆlzle, U. - The Case for Energy-Proportional) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 221.0 Td (Computing, ACM Queue.) Tj ET
+BT /F3 8.0 Tf 0.080 0.250 0.520 rg 84.0 211.0 Td (https://queue.acm.org/detail.cfm?id=1558374) Tj ET
+BT /F2 8.7 Tf 0.030 0.030 0.030 rg 70.0 197.5 Td (4.) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 197.5 Td (Microsoft Support - Change the power mode for your Windows PC.) Tj ET
+BT /F3 8.0 Tf 0.080 0.250 0.520 rg 84.0 187.5 Td (https://support.microsoft.com/windows/change-the-power-mode-for-your-windows-pc) Tj ET
+BT /F2 8.7 Tf 0.030 0.030 0.030 rg 70.0 174.0 Td (5.) Tj ET
+BT /F1 8.3 Tf 0.030 0.030 0.030 rg 84.0 174.0 Td (Visual Studio Code - Extension API documentation.) Tj ET
+BT /F3 8.0 Tf 0.080 0.250 0.520 rg 84.0 164.0 Td (https://code.visualstudio.com/api) Tj ET
+BT /F3 7.8 Tf 0.400 0.400 0.400 rg 70.0 64.0 Td (Sources accessed for project preparation and green-computing background.) Tj ET
+q 0.750 0.750 0.750 RG 0.3 w 70.0 45.0 m 525.0 45.0 l S Q
+BT /F1 8.0 Tf 0.400 0.400 0.400 rg 70.0 29.0 Td (Vishal Radheshyam Yadav | Roll no.: 2619064) Tj ET
+BT /F1 8.0 Tf 0.400 0.400 0.400 rg 510.0 29.0 Td (2) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 8 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R] /Count 2 >>
+endobj
+9 0 obj
+<< /Type /Catalog /Pages 8 0 R >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000000238 00000 n 
+0000001851 00000 n 
+0000001997 00000 n 
+0000006896 00000 n 
+0000007042 00000 n 
+0000007105 00000 n 
+trailer
+<< /Size 10 /Root 9 0 R >>
+startxref
+7154
+%%EOF
