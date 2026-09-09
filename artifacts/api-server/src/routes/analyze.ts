@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { analyzeCode, normalizeLanguage, type SupportedLanguage } from "../services/analyzer";
+import { analyzeCode, normalizeLanguage } from "../services/analyzer";
 import { executeCode, type ExecutionResult, executionLimits } from "../services/sandbox";
 
 const router = Router();
@@ -7,100 +7,75 @@ const MAX_CODE_BYTES = 200_000;
 const DEFAULT_CPU_WATTS = 25;
 const DEFAULT_CARBON_G_PER_KWH = 400;
 
-type RunPayload = {
-  code?: unknown;
-  language?: unknown;
-  compareCode?: unknown;
-  compareLanguage?: unknown;
-  execute?: unknown;
-};
+type RunPayload = { code?: unknown; language?: unknown; compareCode?: unknown; compareLanguage?: unknown; execute?: unknown };
 
 function numberEnv(name: string, fallback: number) {
   const value = Number(process.env[name]);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
-function seconds(ms: number | null) { return ms == null ? null : ms / 1000; }
-
 function ecoEstimate(execution: ExecutionResult | null) {
-  if (!execution?.measured || execution.cpuTimeMs == null) {
-    return { energyWh: null, carbonGrams: null, basis: "No direct energy meter was available for this run.", measured: false, assumptions: { cpuPackageWatts: numberEnv("ECODEV_CPU_WATTS", DEFAULT_CPU_WATTS), carbonIntensityGPerKwh: numberEnv("ECODEV_CARBON_G_PER_KWH", DEFAULT_CARBON_G_PER_KWH) } };
-  }
   const watts = numberEnv("ECODEV_CPU_WATTS", DEFAULT_CPU_WATTS);
   const carbonIntensity = numberEnv("ECODEV_CARBON_G_PER_KWH", DEFAULT_CARBON_G_PER_KWH);
+  if (!execution?.measured || execution.cpuTimeMs == null) {
+    return { energyWh: null, carbonGrams: null, measured: false, basis: "No direct energy meter was available for this run.", assumptions: { cpuPackageWatts: watts, carbonIntensityGPerKwh: carbonIntensity } };
+  }
   const energyWh = (execution.cpuTimeMs / 1000) * watts / 3600;
   const carbonGrams = energyWh * carbonIntensity;
-  return {
-    energyWh,
-    carbonGrams,
-    basis: "Estimated from measured process CPU time using a configurable average CPU-package power assumption; carbon is energy × configured grid intensity.",
-    measured: false,
-    assumptions: { cpuPackageWatts: watts, carbonIntensityGPerKwh: carbonIntensity },
-  };
+  return { energyWh: Number(energyWh.toFixed(6)), carbonGrams: Number(carbonGrams.toFixed(6)), measured: false, basis: "Estimated from measured process CPU time using a configurable average CPU-package power assumption; carbon is energy × configured grid intensity.", assumptions: { cpuPackageWatts: watts, carbonIntensityGPerKwh: carbonIntensity } };
 }
 
-function summarizeExecution(execution: ExecutionResult | null) {
+function summarize(execution: ExecutionResult | null) {
   if (!execution) return null;
   return {
-    ...execution,
+    status: execution.status, stdout: execution.stdout, stderr: execution.stderr, exitCode: execution.exitCode,
     wallTimeMs: execution.wallTimeMs == null ? null : Number(execution.wallTimeMs.toFixed(3)),
     cpuTimeMs: execution.cpuTimeMs == null ? null : Number(execution.cpuTimeMs.toFixed(3)),
-    peakMemoryKb: execution.peakMemoryKb,
+    peakMemoryKb: execution.peakMemoryKb, measured: execution.measured, sandbox: execution.sandbox,
   };
-}
-
-function invalid(message: string, status = 400) {
-  return { status, body: { error: message } };
 }
 
 router.post("/analyze", async (req, res) => {
-  const body = req.body as RunPayload;
-  if (typeof body.code !== "string") return res.status(400).json(invalid("code must be a string").body);
-  if (!body.code.trim()) return res.status(400).json(invalid("code cannot be empty").body);
-  if (Buffer.byteLength(body.code, "utf8") > MAX_CODE_BYTES) return res.status(413).json(invalid(`code exceeds the ${MAX_CODE_BYTES} byte limit`, 413).body);
+  try {
+    const body = req.body as RunPayload;
+    if (typeof body.code !== "string") return res.status(400).json({ error: "code must be a string" });
+    if (!body.code.trim()) return res.status(400).json({ error: "code cannot be empty" });
+    if (Buffer.byteLength(body.code, "utf8") > MAX_CODE_BYTES) return res.status(413).json({ error: `code exceeds the ${MAX_CODE_BYTES} byte limit` });
 
-  const languageHint = body.language == null ? null : normalizeLanguage(String(body.language));
-  if (body.language != null && !languageHint) {
-    return res.status(400).json({ error: "Unsupported language. Supported languages: JavaScript, TypeScript, Python, C, C++, Go." });
-  }
+    const language = body.language == null ? null : normalizeLanguage(String(body.language));
+    if (body.language != null && !language) return res.status(400).json({ error: "Unsupported language. Use JavaScript, TypeScript, Python, C, C++, or Go." });
 
-  const staticResult = analyzeCode(body.code, languageHint);
-  const shouldExecute = body.execute !== false;
-  let compile: ExecutionResult | null = null;
-  let execution: ExecutionResult | null = null;
+    const analysis = analyzeCode(body.code, language);
+    if (!language && analysis.confidence === "low") return res.status(422).json({ error: "Language could not be inferred confidently. Select a language explicitly." });
 
-  if (shouldExecute) {
-    // executeCode reports compile_error separately, but keeping compile/run as distinct
-    // fields is useful for the UI and for future compiler instrumentation.
-    const started = performance.now();
-    execution = await executeCode(body.code, staticResult.language);
-    if (execution.status === "compile_error") {
-      compile = { ...execution, wallTimeMs: execution.wallTimeMs == null ? null : execution.wallTimeMs };
-      execution = null;
+    let compile: ExecutionResult | null = null;
+    let execution: ExecutionResult | null = null;
+    if (body.execute !== false) {
+      const run = await executeCode(body.code, analysis.language);
+      compile = run.compile;
+      execution = run.execution;
     }
-    // Avoid a magic "analysis duration": the server computes this from the actual request.
-    const serverDurationMs = performance.now() - started;
-    const eco = ecoEstimate(execution);
 
     let comparison = null;
-    if (typeof body.compareCode === "string" && body.compareCode.trim() && Buffer.byteLength(body.compareCode, "utf8") <= MAX_CODE_BYTES) {
-      const comparisonLanguage = body.compareLanguage == null ? staticResult.language : normalizeLanguage(String(body.compareLanguage));
-      if (comparisonLanguage) {
-        const comparisonStatic = analyzeCode(body.compareCode, comparisonLanguage);
-        const comparisonExec = shouldExecute ? await executeCode(body.compareCode, comparisonStatic.language) : null;
-        const beforeMs = execution?.wallTimeMs ?? null;
-        const afterMs = comparisonExec?.wallTimeMs ?? null;
-        const beforeMem = execution?.peakMemoryKb ?? null;
-        const afterMem = comparisonExec?.peakMemoryKb ?? null;
+    const compare = typeof body.compareCode === "string" && body.compareCode.trim() && Buffer.byteLength(body.compareCode, "utf8") <= MAX_CODE_BYTES ? body.compareCode : null;
+    if (compare) {
+      const compareLanguage = body.compareLanguage == null ? analysis.language : normalizeLanguage(String(body.compareLanguage));
+      if (compareLanguage) {
+        const compareAnalysis = analyzeCode(compare, compareLanguage);
+        const compareRun = body.execute === false ? { compile: null, execution: null } : await executeCode(compare, compareAnalysis.language);
+        const beforeRuntime = execution?.wallTimeMs ?? null;
+        const afterRuntime = compareRun.execution?.wallTimeMs ?? null;
+        const beforeMemory = execution?.peakMemoryKb ?? null;
+        const afterMemory = compareRun.execution?.peakMemoryKb ?? null;
+        const beforeEco = ecoEstimate(execution);
+        const afterEco = ecoEstimate(compareRun.execution);
         comparison = {
-          analysis: comparisonStatic,
-          execution: summarizeExecution(comparisonExec),
-          eco: ecoEstimate(comparisonExec),
+          analysis: compareAnalysis, compile: summarize(compareRun.compile), execution: summarize(compareRun.execution), eco: afterEco,
           delta: {
-            runtimeMs: beforeMs != null && afterMs != null ? afterMs - beforeMs : null,
-            runtimePercent: beforeMs && afterMs != null ? ((afterMs - beforeMs) / beforeMs) * 100 : null,
-            peakMemoryKb: beforeMem != null && afterMem != null ? afterMem - beforeMem : null,
-            carbonGrams: eco.carbonGrams != null && comparisonExec ? eco.carbonGrams - ecoEstimate(comparisonExec).carbonGrams! : null,
+            runtimeMs: beforeRuntime != null && afterRuntime != null ? Number((afterRuntime - beforeRuntime).toFixed(3)) : null,
+            runtimePercent: beforeRuntime && afterRuntime != null ? Number((((afterRuntime - beforeRuntime) / beforeRuntime) * 100).toFixed(2)) : null,
+            peakMemoryKb: beforeMemory != null && afterMemory != null ? afterMemory - beforeMemory : null,
+            carbonGrams: beforeEco.carbonGrams != null && afterEco.carbonGrams != null ? Number((afterEco.carbonGrams - beforeEco.carbonGrams).toFixed(6)) : null,
           },
         };
       }
@@ -108,28 +83,19 @@ router.post("/analyze", async (req, res) => {
 
     return res.json({
       ok: true,
-      submission: { language: staticResult.language, detectionConfidence: staticResult.confidence, bytes: staticResult.bytes, lines: staticResult.lines },
-      analysis: staticResult,
-      compile: summarizeExecution(compile),
-      execution: summarizeExecution(execution),
-      eco,
+      submission: { language: analysis.language, detectionConfidence: analysis.confidence, bytes: analysis.bytes, lines: analysis.lines },
+      analysis,
+      compile: summarize(compile),
+      execution: summarize(execution),
+      eco: ecoEstimate(execution),
       comparison,
-      serverDurationMs: Number(serverDurationMs.toFixed(3)),
       limits: executionLimits,
+      model: { cpuPackagePowerW: numberEnv("ECODEV_CPU_WATTS", DEFAULT_CPU_WATTS), carbonIntensityGPerKwh: numberEnv("ECODEV_CARBON_G_PER_KWH", DEFAULT_CARBON_G_PER_KWH), note: "Energy and carbon are estimates unless a hardware energy meter is explicitly integrated." },
     });
+  } catch (error) {
+    req.log?.error?.({ err: error }, "Code analysis failed");
+    return res.status(500).json({ error: "Analysis failed unexpectedly. Check server logs for details." });
   }
-
-  return res.json({
-    ok: true,
-    submission: { language: staticResult.language, detectionConfidence: staticResult.confidence, bytes: staticResult.bytes, lines: staticResult.lines },
-    analysis: staticResult,
-    compile: null,
-    execution: null,
-    eco: ecoEstimate(null),
-    comparison: null,
-    serverDurationMs: null,
-    limits: executionLimits,
-  });
 });
 
 export default router;
