@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeCode, detectLanguage } from "./analyzer";
+import { analyzeCode, detectLanguage } from "./analyzer.ts";
 
 test("detects JavaScript from explicit language and patterns", () => {
   assert.equal(detectLanguage("const x = 1;", "javascript").language, "javascript");
