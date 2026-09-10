@@ -69,10 +69,12 @@ async function snapshot(): Promise<Snapshot> {
   return { timestamp: new Date().toISOString(), platform: process.platform, cpuCount: os.cpus().length, loadAverage, memoryTotalBytes: total, memoryFreeBytes: free, memoryUsedPercent: Number(memoryUsedPercent.toFixed(2)), batteryPercent: b.percent, batteryCharging: b.charging, topProcesses, recommendations: recommendations({ memoryUsedPercent, batteryPercent: b.percent, batteryCharging: b.charging, load: loadAverage, topProcesses }) };
 }
 
+const securityHeaders = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "access-control-allow-origin": "*", "access-control-allow-methods": "GET, OPTIONS" };
 const server = http.createServer(async (req, res) => {
-  if (req.url === "/healthz") { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ ok: true, service: "ecodev-desktop-agent" })); return; }
-  if (req.url === "/v1/device") { const data = await snapshot(); res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); res.end(JSON.stringify(data)); return; }
-  res.writeHead(404); res.end();
+  if (req.method === "OPTIONS") { res.writeHead(204, securityHeaders); res.end(); return; }
+  if (req.url === "/healthz") { res.writeHead(200, securityHeaders); res.end(JSON.stringify({ ok: true, service: "ecodev-desktop-agent" })); return; }
+  if (req.method === "GET" && req.url === "/v1/device") { const data = await snapshot(); res.writeHead(200, securityHeaders); res.end(JSON.stringify(data)); return; }
+  res.writeHead(404, securityHeaders); res.end(JSON.stringify({ error: "not found" }));
 });
 server.listen(PORT, "127.0.0.1", () => console.log(`EcoDev desktop agent listening on http://127.0.0.1:${PORT}`));
 setInterval(() => void snapshot(), INTERVAL_MS).unref();
