@@ -1,6 +1,6 @@
 # EcoDev real analyzer
 
-The Analyzer page now calls `POST /api/analyze` with the exact source text from the editor. Static analysis and execution are separate concerns.
+EcoDev turns submitted source code into a measurable engineering report. The analyzer uses the exact source text received by `POST /api/analyze`; it does not use fixed demo runtime or memory numbers.
 
 ## Supported languages
 
@@ -8,14 +8,14 @@ JavaScript, TypeScript, Python, C, C++, and Go.
 
 ## Measurements vs estimates
 
-- **Runtime / wall time**: measured by the server process for a sandbox invocation when execution is available.
-- **CPU time**: measured from GNU `time -v` output when the runtime image provides it; otherwise the service falls back to wall time only for successful runs.
+- **Runtime / wall time**: measured by the server process for a sandbox invocation when secure execution is available.
+- **CPU time**: measured from GNU `time -v` output when the runtime image provides it; otherwise the successful-run value may fall back to wall time and is labelled accordingly.
 - **Peak memory**: measured from maximum resident set size when GNU `time -v` is available.
-- **Time/space complexity**: static structural inference. It is never presented as measured runtime.
-- **Energy**: estimated as `CPU seconds × configured CPU-package watts`.
-- **Carbon**: estimated as `energy kWh × configured carbon intensity (gCO2e/kWh)`.
+- **Time/space complexity**: static structural inference. It is not a measurement and cannot prove arbitrary-program complexity.
+- **Energy**: estimated from measured process CPU time and a configurable CPU-package power assumption.
+- **Carbon**: estimated as energy in kWh multiplied by configured grid carbon intensity.
 
-The defaults are deliberately explicit and configurable:
+Defaults are explicit and configurable:
 
 - `ECODEV_CPU_WATTS=25`
 - `ECODEV_CARBON_G_PER_KWH=400`
@@ -23,20 +23,42 @@ The defaults are deliberately explicit and configurable:
 - `ECODEV_EXEC_MEMORY_MB=256`
 - `ECODEV_EXEC_PIDS=32`
 
-An actual hardware energy meter can replace the model later; until then, energy/carbon values must remain labelled estimates.
+EcoDev never labels modeled energy/carbon as directly measured. A hardware meter can replace the estimate later.
+
+## Benchmarking
+
+`benchmarkIterations` accepts 1–5 runs. For more than one run, EcoDev reports the median wall/CPU result and the maximum observed RSS among completed runs. This reduces the effect of one noisy sample while keeping execution bounded.
+
+## Optimization profiles
+
+`preferences.profile` can be `balanced`, `fast`, `memory`, `green`, `reliable`, `secure`, or `scalable`. The API ranks the same concrete alternatives differently according to the requested engineering goal. An optional `preferences.instruction` is preserved in the response so clients can show the user's decision context. Rankings do not prove semantic equivalence; candidate code should be tested before adoption.
 
 ## Sandbox
 
 The service prefers Bubblewrap (`bwrap`) and then Firejail. Both paths clear the inherited environment, disable networking, create a private writable workspace, apply memory/process limits, and kill over-timeout processes. Temporary source files are removed after each run.
 
-If neither sandbox runtime is installed, the API **fails closed for code execution** and returns static analysis plus a `sandbox_unavailable` execution status. Do not set `ECODEV_ALLOW_UNSANDBOXED_EXECUTION=true` in production; that switch exists only for controlled local development.
+If neither sandbox runtime is installed, the API **fails closed for code execution** and returns static analysis plus a `sandbox_unavailable` execution status. There is no production switch for bypassing the sandbox.
 
 The server never forwards shell text supplied by users to a host shell. User source is written as a file and the executor only invokes fixed compiler/runtime argument lists for supported languages.
 
-## Optimization comparison
+## VS Code and desktop companion
 
-Send `compareCode` to `/api/analyze` to benchmark a candidate implementation against the baseline in the same request. The response reports runtime, memory, and estimated-carbon deltas. Results are tied to the two exact source submissions.
+- `integrations/vscode` provides a VS Code extension with explicit on-demand analysis and optional on-save analysis. It can send a selected file/selection to the EcoDev API using the configured endpoint and optimization profile.
+- `integrations/desktop-agent` is a localhost-only companion that provides CPU/load, memory, battery state when available, top-process context, and practical power-management recommendations. It binds to `127.0.0.1` and does not upload telemetry by itself.
+
+The browser cannot safely enumerate arbitrary operating-system processes or VS Code activity. Device-wide monitoring therefore belongs in the local companion, not in a website pretending to have OS access.
+
+## Green-computing model
+
+EcoDev uses the Green Software Foundation concepts of energy efficiency, carbon awareness, and hardware efficiency as design guidance. Operational energy/carbon is only one part of impact; hardware lifecycle and utilization also matter. The Software Carbon Intensity (SCI) standard is an appropriate future measurement target because it reports carbon per functional unit rather than only a raw total.
+
+References:
+
+- Green Software Foundation — Green Software Practitioner concepts: https://learn.greensoftware.foundation/introduction/
+- Green Software Foundation — Energy Efficiency: https://learn.greensoftware.foundation/energy-efficiency/
+- Green Software Foundation — Hardware Efficiency: https://learn.greensoftware.foundation/hardware-efficiency/
+- Green Software Foundation — Software Carbon Intensity: https://greensoftware.foundation/standards/sci/
 
 ## Limitations
 
-Static complexity inference is intentionally conservative and heuristic. It cannot prove arbitrary program complexity. Benchmark results are environment-specific and should be treated as workload measurements, not universal performance guarantees.
+Static complexity inference is intentionally heuristic. Benchmark results are environment- and workload-specific, so an improvement on one machine or input distribution is not a universal guarantee. Security-sensitive, performance-critical, or production changes should be reviewed and tested independently.
