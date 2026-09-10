@@ -19,5 +19,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+      - run: pnpm --filter @workspace/api-zod build
       - run: pnpm --filter @workspace/api-server typecheck
       - run: pnpm --filter @workspace/api-server test
