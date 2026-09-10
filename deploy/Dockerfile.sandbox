@@ -4,7 +4,7 @@ ENV NODE_ENV=production \
     PATH=/usr/local/bin:/usr/bin:/bin
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends bubblewrap gcc g++ python3 ca-certificates time \
+  && apt-get install -y --no-install-recommends bubblewrap gcc g++ golang-go python3 ca-certificates time \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
