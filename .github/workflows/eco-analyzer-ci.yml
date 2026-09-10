@@ -2,7 +2,7 @@ name: EcoDev CI
 
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [main, 'feature/**', production-readiness]
   pull_request:
     branches: [main]
 
@@ -25,3 +25,31 @@ jobs:
         run: pnpm --filter @workspace/api-server typecheck
       - name: Test API
         run: pnpm --filter @workspace/api-server test
+
+  validate-vscode-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install extension dependencies
+        working-directory: integrations/vscode
+        run: npm install
+      - name: Compile extension
+        working-directory: integrations/vscode
+        run: npm run compile
+
+  validate-desktop-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install desktop agent dependencies
+        working-directory: integrations/desktop-agent
+        run: npm install
+      - name: Typecheck desktop agent
+        working-directory: integrations/desktop-agent
+        run: npm run typecheck

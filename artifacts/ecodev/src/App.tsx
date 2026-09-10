@@ -1,3 +1,11 @@
 import AppReal from './AppReal';
+import DeviceWidget from './DeviceWidget';
 
-export default AppReal;
+export default function App() {
+  return (
+    <>
+      <AppReal />
+      <DeviceWidget />
+    </>
+  );
+}

@@ -1,0 +1,23 @@
+FROM node:24-bookworm-slim
+
+ENV NODE_ENV=production \
+    PATH=/usr/local/bin:/usr/bin:/bin
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bubblewrap gcc g++ golang-go python3 ca-certificates time \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY lib ./lib
+COPY artifacts/api-server ./artifacts/api-server
+
+RUN corepack enable && pnpm install --frozen-lockfile \
+  && pnpm run typecheck:libs \
+  && pnpm --filter @workspace/api-server typecheck \
+  && pnpm --filter @workspace/api-server build \
+  && pnpm store prune
+
+USER node
+EXPOSE 5000
+CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
