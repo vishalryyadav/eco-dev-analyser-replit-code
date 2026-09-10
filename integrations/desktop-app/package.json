@@ -1,0 +1,9 @@
+{
+  "name": "ecodev-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "EcoDev desktop shell for local green-computing insights and code analysis.",
+  "main": "main.cjs",
+  "scripts": { "start": "electron .", "lint-config": "node --check main.cjs" },
+  "devDependencies": { "electron": "^38.1.0" }
+}
