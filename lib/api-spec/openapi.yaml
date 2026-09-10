@@ -1,36 +1,67 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: EcoDev analysis API
 servers:
   - url: /api
     description: Base API path
-tags:
-  - name: health
-    description: Health operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
-      summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string }
+  /analyze:
+    post:
+      operationId: analyzeCode
+      summary: Analyze and optionally execute a code submission
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeRequest'
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyzeResponse'
+        '400': { description: Invalid request }
+        '413': { description: Submission too large }
+        '422': { description: Language could not be inferred }
 components:
   schemas:
-    HealthStatus:
+    AnalyzeRequest:
       type: object
+      required: [code]
       properties:
-        status:
-          type: string
-      required:
-        - status
-
+        code: { type: string, maxLength: 200000 }
+        language: { type: string, enum: [javascript, typescript, python, c, cpp, go] }
+        compareCode: { type: string, maxLength: 200000 }
+        compareLanguage: { type: string, enum: [javascript, typescript, python, c, cpp, go] }
+        execute: { type: boolean, default: true }
+    AnalyzeResponse:
+      type: object
+      required: [ok, submission, analysis, eco]
+      properties:
+        ok: { type: boolean }
+        submission: { type: object, additionalProperties: true }
+        analysis: { type: object, additionalProperties: true }
+        compile: { type: [object, 'null'], additionalProperties: true }
+        execution: { type: [object, 'null'], additionalProperties: true }
+        eco: { type: object, additionalProperties: true }
+        comparison: { type: [object, 'null'], additionalProperties: true }
+        limits: { type: object, additionalProperties: true }
+        model: { type: object, additionalProperties: true }

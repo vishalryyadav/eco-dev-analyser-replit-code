@@ -11,23 +11,15 @@ app.use(
     logger,
     serializers: {
       req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
+        return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
       },
-      res(res) {
-        return {
-          statusCode: res.statusCode,
-        };
-      },
+      res(res) { return { statusCode: res.statusCode }; },
     },
   }),
 );
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "256kb" }));
+app.use(express.urlencoded({ extended: true, limit: "256kb" }));
 
 app.use("/api", router);
 
