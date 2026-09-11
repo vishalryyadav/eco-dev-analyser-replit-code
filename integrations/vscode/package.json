@@ -1,18 +1,19 @@
 {
   "name": "ecodev-green-code",
   "displayName": "EcoDev Green Code Analyzer",
-  "description": "Analyze code in VS Code for complexity, performance, memory, and green-computing trade-offs.",
-  "version": "0.1.0",
+  "description": "Analyze code in VS Code for complexity, performance, memory, security, and green-computing trade-offs.",
+  "version": "0.2.0",
   "publisher": "ecodev",
   "license": "MIT",
   "engines": { "vscode": ">=1.90.0" },
   "categories": ["Linters", "Other", "Programming Languages"],
-  "activationEvents": ["onStartupFinished", "onCommand:ecodev.analyzeFile", "onCommand:ecodev.analyzeSelection"],
+  "activationEvents": ["onStartupFinished", "onCommand:ecodev.analyzeFile", "onCommand:ecodev.analyzeSelection", "onCommand:ecodev.analyzeWorkspace"],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       { "command": "ecodev.analyzeFile", "title": "EcoDev: Analyze Current File" },
       { "command": "ecodev.analyzeSelection", "title": "EcoDev: Analyze Selection" },
+      { "command": "ecodev.analyzeWorkspace", "title": "EcoDev: Analyze Workspace" },
       { "command": "ecodev.openSettings", "title": "EcoDev: Open Settings" }
     ],
     "configuration": {
