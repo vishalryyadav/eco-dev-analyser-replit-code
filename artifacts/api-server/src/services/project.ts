@@ -1,5 +1,5 @@
-import { analyzeCode, normalizeLanguage, type SupportedLanguage } from "./analyzer";
-import { securityAnalyze } from "./security";
+import { analyzeCode, normalizeLanguage, type SupportedLanguage } from "./analyzer.ts";
+import { securityAnalyze } from "./security.ts";
 
 export type ProjectFile = { path: string; code: string; language?: string | null };
 export type ProjectReport = {
