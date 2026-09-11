@@ -14,7 +14,7 @@ router.post("/coach", async (req, res) => {
   const analysis = analyzeCode(body.code, language);
   const security = securityAnalyze(body.code, analysis.language);
   const result = await coachCode({ code: body.code, language: analysis.language, analysis, security, instruction: typeof body.instruction === "string" ? body.instruction.slice(0, 2000) : null });
-  res.json({ ok: true, ...result, analysis, security });
+  return res.json({ ok: true, ...result, analysis, security });
 });
 
 export default router;
