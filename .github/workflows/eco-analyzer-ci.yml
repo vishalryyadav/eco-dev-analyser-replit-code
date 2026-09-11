@@ -45,6 +45,44 @@ jobs:
       - name: Build frontend
         run: pnpm --filter @workspace/ecodev build
 
+  smoke-production-server:
+    needs: [test-api, validate-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Build frontend
+        run: pnpm --filter @workspace/ecodev build
+      - name: Build API
+        run: pnpm --filter @workspace/api-server build
+      - name: Start production API serving frontend
+        env:
+          PORT: 5000
+          ECODEV_CORS_ORIGIN: http://127.0.0.1:5000
+        run: |
+          pnpm --filter @workspace/api-server start > /tmp/ecodev-server.log 2>&1 &
+          echo $! > /tmp/ecodev-server.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5000/healthz >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:5000/healthz
+          curl -fsS http://127.0.0.1:5000/ | grep -q 'EcoDev Code Analyzer'
+          curl -fsS -X POST http://127.0.0.1:5000/api/analyze -H 'content-type: application/json' --data '{"code":"console.log(2+2)","language":"javascript","execute":false}' | grep -q '"ok":true'
+      - name: Server log on failure
+        if: failure()
+        run: cat /tmp/ecodev-server.log || true
+      - name: Stop server
+        if: always()
+        run: kill $(cat /tmp/ecodev-server.pid) 2>/dev/null || true
+
   validate-replit-startup:
     runs-on: ubuntu-latest
     steps:
@@ -93,3 +131,17 @@ jobs:
       - name: Typecheck desktop agent
         working-directory: integrations/desktop-agent
         run: npm run typecheck
+
+  validate-desktop-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install desktop app dependencies
+        working-directory: integrations/desktop-app
+        run: npm install
+      - name: Validate Electron main process
+        working-directory: integrations/desktop-app
+        run: npm run lint-config
