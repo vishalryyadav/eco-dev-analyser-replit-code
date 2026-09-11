@@ -10,6 +10,7 @@ export type ExecutionResult = {
   stdout: string;
   stderr: string;
   exitCode: number | null;
+  signal: string | null;
   wallTimeMs: number | null;
   cpuTimeMs: number | null;
   peakMemoryKb: number | null;
@@ -21,20 +22,21 @@ type Definition = { source: string; compile: string[] | null; run: string[] };
 
 const definitions: Record<SupportedLanguage, Definition> = {
   javascript: { source: "main.js", compile: null, run: ["node", "main.js"] },
-  typescript: {
-    source: "main.ts",
-    compile: ["tsc", "main.ts", "--target", "ES2022", "--module", "commonjs", "--outDir", "build", "--pretty", "false"],
-    run: ["node", "build/main.js"],
-  },
+  typescript: { source: "main.ts", compile: ["tsc", "main.ts", "--target", "ES2022", "--module", "commonjs", "--outDir", "build", "--pretty", "false"], run: ["node", "build/main.js"] },
   python: { source: "main.py", compile: null, run: ["python3", "-I", "main.py"] },
   c: { source: "main.c", compile: ["gcc", "-O2", "-std=c11", "main.c", "-o", "main"], run: ["./main"] },
   cpp: { source: "main.cpp", compile: ["g++", "-O2", "-std=c++17", "main.cpp", "-o", "main"], run: ["./main"] },
   go: { source: "main.go", compile: ["go", "build", "-o", "main", "main.go"], run: ["./main"] },
 };
 
-const LIMIT_MS = Math.max(250, Math.min(30_000, Number(process.env.ECODEV_EXEC_TIMEOUT_MS ?? 5_000)));
-const MEMORY_MB = Math.max(32, Math.min(1024, Number(process.env.ECODEV_EXEC_MEMORY_MB ?? 256)));
-const PIDS = Math.max(8, Math.min(128, Number(process.env.ECODEV_EXEC_PIDS ?? 32)));
+function positiveNumber(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+const LIMIT_MS = Math.max(250, Math.min(30_000, positiveNumber("ECODEV_EXEC_TIMEOUT_MS", 5_000)));
+const MEMORY_MB = Math.max(32, Math.min(1_024, positiveNumber("ECODEV_EXEC_MEMORY_MB", 256)));
+const PIDS = Math.max(8, Math.min(128, positiveNumber("ECODEV_EXEC_PIDS", 32)));
 const WORK_ROOT = process.env.ECODEV_WORK_ROOT || tmpdir();
 const OUTPUT_LIMIT = 32_000;
 
@@ -64,6 +66,9 @@ function buildCommand(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
 
   if (runtime === "bubblewrap") {
     const binds: string[] = [
+      "--die-with-parent",
+      "--unshare-all",
+      "--new-session",
       "--ro-bind", "/usr", "/usr",
       "--ro-bind", "/bin", "/bin",
       "--ro-bind", "/lib", "/lib",
@@ -72,76 +77,46 @@ function buildCommand(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
       "--tmpfs", "/tmp",
       "--bind", cwd, "/workspace",
       "--chdir", "/workspace",
+      "--clearenv",
+      "--setenv", "PATH", "/usr/local/bin:/usr/bin:/bin",
+      "--setenv", "HOME", "/tmp",
+      "--setenv", "LANG", "C.UTF-8",
+      "--setenv", "LC_ALL", "C.UTF-8",
     ];
-    if (process.platform === "linux") binds.push("--ro-bind", "/usr/local", "/usr/local");
-    if (process.platform === "linux") binds.push("--ro-bind-try", "/lib64", "/lib64");
-
-    return {
-      command: "bwrap",
-      args: [
-        "--die-with-parent",
-        "--unshare-all",
-        "--new-session",
-        ...binds,
-        "--clearenv",
-        "--setenv", "PATH", "/usr/local/bin:/usr/bin:/bin",
-        "--setenv", "HOME", "/tmp",
-        "--setenv", "LANG", "C.UTF-8",
-        "--setenv", "LC_ALL", "C.UTF-8",
-        "--",
-        "sh", "-c", limited,
-      ],
-    };
+    binds.push("--ro-bind-try", "/usr/local", "/usr/local");
+    binds.push("--ro-bind-try", "/lib64", "/lib64");
+    return { command: "bwrap", args: [...binds, "--", "sh", "-c", limited] };
   }
 
   return {
     command: "firejail",
-    args: [
-      "--quiet",
-      "--private",
-      "--net=none",
-      "--caps.drop=all",
-      "--noroot",
-      `--rlimit-as=${MEMORY_MB * 1024}`,
-      "--",
-      "sh", "-c", limited,
-    ],
+    args: ["--quiet", "--private", "--net=none", "--caps.drop=all", "--noroot", `--rlimit-as=${MEMORY_MB * 1024}`, "--rlimit-nproc=${PIDS}", "--", "sh", "-c", limited],
   };
 }
 
 function parseCpu(stderr: string) {
   const user = stderr.match(/User time \(seconds\):\s*([0-9.]+)/i);
   const sys = stderr.match(/System time \(seconds\):\s*([0-9.]+)/i);
-  return user || sys ? (Number(user?.[1] || 0) + Number(sys?.[1] || 0)) * 1000 : null;
+  return user || sys ? (Number(user?.[1] || 0) + Number(sys?.[1] || 0)) * 1_000 : null;
 }
 
 function parseRss(stderr: string) {
-  const m = stderr.match(/Maximum resident set size \(kbytes\):\s*(\d+)/i);
-  return m ? Number(m[1]) : null;
+  const match = stderr.match(/Maximum resident set size \(kbytes\):\s*(\d+)/i);
+  return match ? Number(match[1]) : null;
 }
 
 function cap(value: string) {
-  return value.slice(0, OUTPUT_LIMIT);
+  return value.length > OUTPUT_LIMIT ? `${value.slice(0, OUTPUT_LIMIT)}\n[output truncated]` : value;
 }
 
-async function runOne(
-  runtime: "bubblewrap" | "firejail",
-  args: string[],
-  cwd: string,
-  timeoutMs: number,
-): Promise<ExecutionResult> {
+async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: string, timeoutMs: number): Promise<ExecutionResult> {
   const started = process.hrtime.bigint();
   const wrapped = buildCommand(runtime, args, cwd);
 
   return new Promise((resolve) => {
     const child = spawn(wrapped.command, wrapped.args, {
-      cwd: runtime === "bubblewrap" ? "/" : cwd,
-      env: {
-        PATH: "/usr/local/bin:/usr/bin:/bin",
-        HOME: "/tmp",
-        LANG: "C.UTF-8",
-        LC_ALL: "C.UTF-8",
-      },
+      cwd: "/",
+      env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: "/tmp", LANG: "C.UTF-8", LC_ALL: "C.UTF-8" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -151,21 +126,17 @@ async function runOne(
     let timedOut = false;
     let outputKilled = false;
 
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-      if (stdout.length > OUTPUT_LIMIT && !outputKilled) {
+    const append = (target: "stdout" | "stderr", chunk: Buffer | string) => {
+      if (target === "stdout") stdout += chunk.toString();
+      else stderr += chunk.toString();
+      if ((stdout.length > OUTPUT_LIMIT || stderr.length > OUTPUT_LIMIT) && !outputKilled) {
         outputKilled = true;
         child.kill("SIGKILL");
       }
-    });
+    };
 
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-      if (stderr.length > OUTPUT_LIMIT && !outputKilled) {
-        outputKilled = true;
-        child.kill("SIGKILL");
-      }
-    });
+    child.stdout.on("data", (chunk: Buffer) => append("stdout", chunk));
+    child.stderr.on("data", (chunk: Buffer) => append("stderr", chunk));
 
     const timer = setTimeout(() => {
       timedOut = true;
@@ -174,29 +145,21 @@ async function runOne(
 
     child.on("error", (error) => {
       clearTimeout(timer);
-      resolve({
-        status: "runtime_error",
-        stdout: cap(stdout),
-        stderr: cap(`${stderr}${error.message}`),
-        exitCode: null,
-        wallTimeMs: Number(process.hrtime.bigint() - started) / 1e6,
-        cpuTimeMs: null,
-        peakMemoryKb: null,
-        measured: false,
-        sandbox: runtime,
-      });
+      const wallTimeMs = Number(process.hrtime.bigint() - started) / 1e6;
+      resolve({ status: "runtime_error", stdout: cap(stdout), stderr: cap(`${stderr}${error.message}`), exitCode: null, signal: null, wallTimeMs, cpuTimeMs: null, peakMemoryKb: null, measured: false, sandbox: runtime });
     });
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       clearTimeout(timer);
-      const wall = Number(process.hrtime.bigint() - started) / 1e6;
+      const wallTimeMs = Number(process.hrtime.bigint() - started) / 1e6;
       resolve({
         status: timedOut ? "timeout" : code === 0 ? "completed" : "runtime_error",
         stdout: cap(stdout),
-        stderr: cap(stderr),
+        stderr: cap(outputKilled ? `${stderr}\n[output limit exceeded]` : stderr),
         exitCode: code,
-        wallTimeMs: wall,
-        cpuTimeMs: parseCpu(stderr) ?? (code === 0 && !timedOut && !outputKilled ? wall : null),
+        signal,
+        wallTimeMs,
+        cpuTimeMs: parseCpu(stderr),
         peakMemoryKb: parseRss(stderr),
         measured: !outputKilled,
         sandbox: runtime,
@@ -213,6 +176,7 @@ export async function executeCode(code: string, language: SupportedLanguage): Pr
       stdout: "",
       stderr: "Secure execution is unavailable in this deployment because Bubblewrap and Firejail were not found. Static analysis remains available.",
       exitCode: null,
+      signal: null,
       wallTimeMs: null,
       cpuTimeMs: null,
       peakMemoryKb: null,
@@ -226,15 +190,11 @@ export async function executeCode(code: string, language: SupportedLanguage): Pr
   const dir = await mkdtemp(path.join(WORK_ROOT, "ecodev-"));
   try {
     await writeFile(path.join(dir, def.source), code, { encoding: "utf8", mode: 0o600 });
-
     let compile: ExecutionResult | null = null;
     if (def.compile) {
       compile = await runOne(sandbox, def.compile, dir, LIMIT_MS);
-      if (compile.status !== "completed") {
-        return { compile: { ...compile, status: "compile_error" }, execution: null };
-      }
+      if (compile.status !== "completed") return { compile: { ...compile, status: "compile_error" }, execution: null };
     }
-
     return { compile, execution: await runOne(sandbox, def.run, dir, LIMIT_MS) };
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => undefined);
