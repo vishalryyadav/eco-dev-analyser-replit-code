@@ -66,6 +66,7 @@ jobs:
         env:
           PORT: 5000
           ECODEV_CORS_ORIGIN: http://127.0.0.1:5000
+          ECODEV_FRONTEND_DIST: ${{ github.workspace }}/artifacts/ecodev/dist
         run: |
           pnpm --filter @workspace/api-server start > /tmp/ecodev-server.log 2>&1 &
           echo $! > /tmp/ecodev-server.pid
