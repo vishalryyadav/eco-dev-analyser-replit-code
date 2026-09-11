@@ -22,17 +22,27 @@ jobs:
             target: mac
             args: --mac dmg
     runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: integrations/desktop-app
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: true
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+          cache: pnpm
+      - name: Build production frontend
+        run: pnpm --filter @workspace/ecodev build
+      - name: Build production API
+        run: pnpm --filter @workspace/api-server build
+      - name: Prepare embedded desktop payload
+        run: node scripts/prepare-desktop-package.mjs
       - name: Install Electron dependencies
+        working-directory: integrations/desktop-app
         run: npm install
       - name: Build desktop package
+        working-directory: integrations/desktop-app
         run: npx electron-builder ${{ matrix.args }} --publish never
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
