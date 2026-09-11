@@ -20,7 +20,7 @@ function infer(path: string, explicit?: string | null) { if (explicit) return no
 
 export function analyzeProject(files: ProjectFile[]): ProjectReport {
   const usable = files.filter((f) => f && typeof f.path === "string" && typeof f.code === "string" && f.path.length <= 240 && !ignored.test(f.path)).slice(0, 200);
-  let totalLines = 0, totalBytes = 0, weightedScore = 0, securityScore = 0;
+  let totalLines = 0, totalBytes = 0, weightedScore = 0, securityScore = 0, filesScanned = 0;
   const languages: Record<string, number> = {};
   const hotspots: ProjectReport["hotspots"] = [];
   const findings: ProjectReport["findings"] = [];
@@ -28,6 +28,7 @@ export function analyzeProject(files: ProjectFile[]): ProjectReport {
   for (const file of usable) {
     const language = infer(file.path, file.language);
     if (!language) continue;
+    filesScanned += 1;
     const analysis = analyzeCode(file.code, language);
     const security = securityAnalyze(file.code, analysis.language);
     totalLines += analysis.lines; totalBytes += analysis.bytes; weightedScore += analysis.score * Math.max(1, analysis.lines); securityScore += security.score * Math.max(1, analysis.lines);
@@ -43,5 +44,5 @@ export function analyzeProject(files: ProjectFile[]): ProjectReport {
   }
   const weight = Math.max(1, totalLines);
   hotspots.sort((a, b) => (a.score + a.securityScore) - (b.score + b.securityScore));
-  return { filesScanned: usable.length, totalLines, totalBytes, languages, score: Number((weightedScore / weight).toFixed(1)), securityScore: Number((securityScore / weight).toFixed(1)), hotspots: hotspots.slice(0, 25), findings: findings.slice(0, 100), alternatives: [...alternatives.values()].slice(0, 20) };
+  return { filesScanned, totalLines, totalBytes, languages, score: Number((weightedScore / weight).toFixed(1)), securityScore: Number((securityScore / weight).toFixed(1)), hotspots: hotspots.slice(0, 25), findings: findings.slice(0, 100), alternatives: [...alternatives.values()].slice(0, 20) };
 }
