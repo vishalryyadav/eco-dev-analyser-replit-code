@@ -1,17 +1,16 @@
-import { describe, expect, it } from "vitest";
-import { securityAnalyze } from "./security";
+import assert from "node:assert/strict";
+import test from "node:test";
+import { securityAnalyze } from "./security.ts";
 
-describe("security analyzer", () => {
-  it("flags dynamic evaluation and shell execution", () => {
-    const result = securityAnalyze("eval(input); child_process.exec(cmd);", "javascript");
-    expect(result.score).toBeLessThan(70);
-    expect(result.findings.some((f) => f.title === "Dynamic code execution")).toBe(true);
-    expect(result.findings.some((f) => f.title === "Shell/process invocation")).toBe(true);
-  });
+test("flags dynamic evaluation and shell execution", () => {
+  const result = securityAnalyze("eval(input); child_process.exec(cmd);", "javascript");
+  assert.ok(result.score < 70);
+  assert.ok(result.findings.some((f) => f.title === "Dynamic code execution"));
+  assert.ok(result.findings.some((f) => f.title === "Shell/process invocation"));
+});
 
-  it("does not report an obvious warning for ordinary arithmetic", () => {
-    const result = securityAnalyze("console.log(2 + 2);", "javascript");
-    expect(result.score).toBe(100);
-    expect(result.findings[0].severity).toBe("info");
-  });
+test("does not report an obvious warning for ordinary arithmetic", () => {
+  const result = securityAnalyze("console.log(2 + 2);", "javascript");
+  assert.equal(result.score, 100);
+  assert.equal(result.findings[0].severity, "info");
 });
