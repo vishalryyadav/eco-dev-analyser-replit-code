@@ -1,5 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -40,6 +42,17 @@ function rateLimit(req: Request, res: Response, next: NextFunction) {
 }
 
 app.use("/api", rateLimit, router);
+
+const frontendDist = path.resolve(process.cwd(), "artifacts/ecodev/dist");
+if (existsSync(frontendDist)) {
+  app.use(express.static(frontendDist, { index: "index.html", maxAge: "1h" }));
+  app.use((req, res, next) => {
+    if (req.method === "GET" && !req.path.startsWith("/api/") && req.accepts("html")) {
+      return res.sendFile(path.join(frontendDist, "index.html"));
+    }
+    return next();
+  });
+}
 
 app.use((error: any, _req: Request, res: Response, _next: NextFunction) => {
   if (error?.type === "entity.too.large") return res.status(413).json({ error: "Request body is too large." });
