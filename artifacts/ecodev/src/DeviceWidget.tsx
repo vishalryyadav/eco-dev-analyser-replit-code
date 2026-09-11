@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
-const AGENT = "http://127.0.0.1:17777/v1/device";
+const AGENT = import.meta.env.VITE_ECODEV_DEVICE_AGENT_URL as
+  | string
+  | undefined;
 
 type DeviceData = {
   memoryUsedPercent: number;
@@ -16,6 +18,8 @@ export default function DeviceWidget() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    if (!AGENT) return;
+
     let mounted = true;
     const poll = async () => {
       try {
