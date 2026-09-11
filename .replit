@@ -18,3 +18,10 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[env]
+ECODEV_EXEC_TIMEOUT_MS = "5000"
+ECODEV_EXEC_MEMORY_MB = "256"
+ECODEV_EXEC_PIDS = "32"
+ECODEV_CPU_WATTS = "25"
+ECODEV_CARBON_G_PER_KWH = "400"
