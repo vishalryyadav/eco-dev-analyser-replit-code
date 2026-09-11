@@ -1,137 +1,105 @@
-import { useMemo, useState } from 'react';
-import { BookOpen, Check, Code2, Gauge, Leaf, LineChart, Loader2, Menu, Play, RefreshCw, Save, Settings, ShieldCheck, Sparkles, X, Zap } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
+import { BookOpen, Check, Code2, Download, FileCode2, Gauge, Leaf, LineChart, Loader2, Menu, Play, RefreshCw, Settings, ShieldCheck, Sparkles, Upload, X, Zap } from 'lucide-react';
 
-type Alternative = {
-  id: string; title: string; description: string; complexity: string;
-  expectedRuntimeChange: string; expectedMemoryChange: string; simplicity: string;
-  readability: string; maintainability: string; portability: string;
-  projectedEnergyChange: string; projectedCarbonChange: string; code?: string;
-};
-type AnalysisResponse = {
-  ok: boolean;
-  submission: { language: string; detectionConfidence: string; bytes: number; lines: number };
-  analysis: { score: number; complexity: { time: string; space: string; basis: string }; findings: { severity: string; title: string; detail: string }[]; alternatives: Alternative[] };
-  compile: { status: string; wallTimeMs: number | null; cpuTimeMs: number | null; stderr: string; measured: boolean } | null;
-  execution: { status: string; wallTimeMs: number | null; cpuTimeMs: number | null; peakMemoryKb: number | null; stdout: string; stderr: string; measured: boolean; sandbox: string } | null;
-  eco: { energyWh: number | null; carbonGrams: number | null; measured: boolean; basis: string; assumptions: { cpuPackageWatts: number; carbonIntensityGPerKwh: number } };
-  comparison: { delta: { runtimeMs: number | null; runtimePercent: number | null; peakMemoryKb: number | null; carbonGrams: number | null }; execution: AnalysisResponse['execution']; eco: AnalysisResponse['eco'] } | null;
-  limits: { timeoutMs: number; memoryMb: number; processLimit: number };
-  model: { note: string };
-};
+type Alternative = { id: string; title: string; description: string; complexity: string; expectedRuntimeChange: string; expectedMemoryChange: string; simplicity: string; readability: string; maintainability: string; portability: string; projectedEnergyChange: string; projectedCarbonChange: string; code?: string };
+type Result = { ok: boolean; submission: { language: string; detectionConfidence: string; bytes: number; lines: number }; analysis: { score: number; complexity: { time: string; space: string; basis: string }; findings: { severity: string; title: string; detail: string }[]; alternatives: Alternative[] }; security: { score: number; findings: { severity: string; title: string; detail: string }[] }; compile: { status: string; stderr: string; } | null; execution: { status: string; wallTimeMs: number | null; cpuTimeMs: number | null; peakMemoryKb: number | null; stdout: string; stderr: string; measured: boolean; sandbox: string } | null; eco: { energyWh: number | null; carbonGrams: number | null; measured: boolean; basis: string; assumptions: { cpuPackageWatts: number; carbonIntensityGPerKwh: number } }; comparison: { delta: { runtimeMs: number | null; runtimePercent: number | null; peakMemoryKb: number | null; carbonGrams: number | null }; execution: Result['execution']; eco: Result['eco'] } | null; limits: { timeoutMs: number; memoryMb: number; processLimit: number }; benchmark: { iterationsRequested: number; strategy: string }; model: { note: string } };
+type Coach = { provider: string; summary: string; recommendations: string[]; nextTests: string[]; risks?: string[] };
 
 const samples: Record<string, { fileName: string; code: string }> = {
-  javascript: { fileName: 'analysis.js', code: `function uniqueItems(items) {\n  const result = [];\n  for (let i = 0; i < items.length; i++) {\n    if (!result.includes(items[i])) result.push(items[i]);\n  }\n  return result;\n}\n\nconsole.log(uniqueItems(Array.from({ length: 1000 }, (_, i) => i % 400)).length);` },
-  typescript: { fileName: 'analysis.ts', code: `function groupBy<T>(items: T[], key: keyof T) {\n  return items.reduce((groups, item) => {\n    const value = String(item[key]);\n    (groups[value] ??= []).push(item);\n    return groups;\n  }, {} as Record<string, T[]>);\n}\n\nconsole.log(groupBy([{id: 1}, {id: 1}, {id: 2}], 'id'));` },
-  python: { fileName: 'analysis.py', code: `def latest(records):\n    out = {}\n    for record in records:\n        key = record["user_id"]\n        if key not in out or record["created_at"] > out[key]["created_at"]:\n            out[key] = record\n    return list(out.values())\n\nprint(latest([{"user_id": 1, "created_at": 2}, {"user_id": 1, "created_at": 3}]))` },
+  javascript: { fileName: 'analysis.js', code: `function uniqueItems(items) {\n  const result = [];\n  for (let i = 0; i < items.length; i++) {\n    if (!result.includes(items[i])) result.push(items[i]);\n  }\n  return result;\n}\nconsole.log(uniqueItems(Array.from({ length: 1000 }, (_, i) => i % 400)).length);` },
+  typescript: { fileName: 'analysis.ts', code: `function groupBy<T>(items: T[], key: keyof T) {\n  return items.reduce((groups, item) => {\n    const value = String(item[key]);\n    (groups[value] ??= []).push(item);\n    return groups;\n  }, {} as Record<string, T[]>);\n}\nconsole.log(groupBy([{id: 1}, {id: 1}, {id: 2}], 'id'));` },
+  python: { fileName: 'analysis.py', code: `def latest(records):\n    out = {}\n    for record in records:\n        key = record["user_id"]\n        if key not in out or record["created_at"] > out[key]["created_at"]:\n            out[key] = record\n    return list(out.values())\nprint(latest([{"user_id": 1, "created_at": 2}, {"user_id": 1, "created_at": 3}]))` },
   c: { fileName: 'analysis.c', code: `#include <stdio.h>\nint main(void) {\n  long total = 0;\n  for (int i = 0; i < 500000; i++) total += i;\n  printf("%ld\\n", total);\n  return 0;\n}` },
   cpp: { fileName: 'analysis.cpp', code: `#include <iostream>\nint main() {\n  long long total = 0;\n  for (int i = 0; i < 500000; ++i) total += i;\n  std::cout << total << "\\n";\n}` },
   go: { fileName: 'analysis.go', code: `package main\nimport "fmt"\nfunc main() {\n  total := 0\n  for i := 0; i < 500000; i++ { total += i }\n  fmt.Println(total)\n}` },
 };
-
-const languageLabels: Record<string, string> = { javascript: 'JavaScript', typescript: 'TypeScript', python: 'Python', c: 'C', cpp: 'C++', go: 'Go' };
-
-function formatMs(value: number | null) { return value == null ? 'Unavailable' : `${value.toFixed(3)} ms`; }
-function formatMemory(value: number | null) { return value == null ? 'Unavailable' : value < 1024 ? `${value} KB` : `${(value / 1024).toFixed(2)} MB`; }
-function formatEnergy(value: number | null) { return value == null ? 'Unavailable' : `${value.toFixed(6)} Wh`; }
-function formatCarbon(value: number | null) { return value == null ? 'Unavailable' : `${value.toFixed(6)} gCO₂e`; }
+const labels: Record<string, string> = { javascript: 'JavaScript', typescript: 'TypeScript', python: 'Python', c: 'C', cpp: 'C++', go: 'Go' };
+const profiles = ['balanced', 'fast', 'memory', 'green', 'reliable', 'secure', 'scalable'];
+function ms(v: number | null | undefined) { return v == null ? 'Unavailable' : `${v.toFixed(3)} ms`; }
+function memory(v: number | null | undefined) { return v == null ? 'Unavailable' : v < 1024 ? `${v} KB` : `${(v / 1024).toFixed(2)} MB`; }
+function energy(v: number | null | undefined) { return v == null ? 'Unavailable' : `${v.toFixed(6)} Wh`; }
+function carbon(v: number | null | undefined) { return v == null ? 'Unavailable' : `${v.toFixed(6)} gCO₂e`; }
 
 export default function AppReal() {
-  const [page, setPage] = useState<'overview' | 'analyzer' | 'history' | 'learn' | 'settings'>('analyzer');
+  const [page, setPage] = useState<'overview'|'analyzer'|'history'|'learn'|'settings'>('analyzer');
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState(samples.javascript.code);
   const [fileName, setFileName] = useState(samples.javascript.fileName);
-  const [candidateCode, setCandidateCode] = useState('');
-  const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [candidate, setCandidate] = useState('');
+  const [profile, setProfile] = useState('balanced');
+  const [iterations, setIterations] = useState(1);
+  const [instruction, setInstruction] = useState('');
+  const [result, setResult] = useState<Result | null>(null);
+  const [coach, setCoach] = useState<Coach | null>(null);
+  const [history, setHistory] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
-  const [compareLoading, setCompareLoading] = useState(false);
+  const [coachLoading, setCoachLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedAlt, setSelectedAlt] = useState('');
-  const [history, setHistory] = useState<AnalysisResponse[]>([]);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const currentAlt = useMemo(() => result?.analysis.alternatives.find(a => a.id === candidate), [result, candidate]);
 
-  const currentAlternative = useMemo(() => result?.analysis.alternatives.find((a) => a.id === selectedAlt), [result, selectedAlt]);
-
-  function loadSample(nextLanguage: string) {
-    const sample = samples[nextLanguage] ?? samples.javascript;
-    setLanguage(nextLanguage); setCode(sample.code); setFileName(sample.fileName); setResult(null); setError(''); setCandidateCode('');
-  }
-
-  async function analyze(compare = false) {
-    setLoading(!compare); setCompareLoading(compare); setError('');
+  useEffect(() => { try { const saved = localStorage.getItem('ecodev-history'); if (saved) setHistory(JSON.parse(saved).slice(0, 12)); } catch {} }, []);
+  function saveHistory(next: Result) { const list = [next, ...history].slice(0, 12); setHistory(list); try { localStorage.setItem('ecodev-history', JSON.stringify(list)); } catch {} }
+  function loadSample(lang: string) { const s = samples[lang] ?? samples.javascript; setLanguage(lang); setCode(s.code); setFileName(s.fileName); setResult(null); setCoach(null); setError(''); }
+  async function analyze() {
+    setLoading(true); setError(''); setCoach(null);
     try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language, execute: true, ...(compare && candidateCode.trim() ? { compareCode: candidateCode, compareLanguage: language } : {}) }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? 'Analysis failed');
-      setResult(data);
-      if (!compare) setHistory((prev) => [data, ...prev].slice(0, 12));
-    } catch (err) { setError(err instanceof Error ? err.message : 'Analysis failed'); }
-    finally { setLoading(false); setCompareLoading(false); }
+      const response = await fetch('/api/analyze', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ code, language, execute: true, benchmarkIterations: iterations, preferences: { profile, instruction }, ...(currentAlt?.code ? { compareCode: currentAlt.code, compareLanguage: language } : {}) }) });
+      const data = await response.json(); if (!response.ok) throw new Error(data.error ?? 'Analysis failed');
+      setResult(data); saveHistory(data);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Analysis failed'); } finally { setLoading(false); }
   }
-
-  function useAlternative() {
-    if (!currentAlternative?.code) return;
-    setCandidateCode(currentAlternative.code);
+  async function runCoach() {
+    setCoachLoading(true); setError('');
+    try { const response = await fetch('/api/coach', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code, language, instruction}) }); const data = await response.json(); if (!response.ok) throw new Error(data.error ?? 'Coach failed'); setCoach(data); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Coach failed'); } finally { setCoachLoading(false); }
   }
+  async function downloadReport(format: 'markdown'|'json') {
+    if (!result) return;
+    const response = await fetch('/api/report', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({result, format}) });
+    const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `ecodev-${Date.now()}.${format === 'markdown' ? 'md' : 'json'}`; a.click(); URL.revokeObjectURL(url);
+  }
+  function importFile(e: ChangeEvent<HTMLInputElement>) { const file = e.target.files?.[0]; if (!file) return; setFileName(file.name); const ext = file.name.split('.').pop()?.toLowerCase(); const detected = ext === 'ts' ? 'typescript' : ext === 'py' ? 'python' : ext === 'cpp' || ext === 'cc' || ext === 'cxx' ? 'cpp' : ext === 'c' ? 'c' : ext === 'go' ? 'go' : 'javascript'; setLanguage(detected); file.text().then(setCode).catch(() => setError('Could not read the selected file.')); }
+  const nav = [['overview','Overview',Gauge],['analyzer','Analyzer',Code2],['history','History',LineChart],['learn','Learn',BookOpen],['settings','Settings',Settings]] as const;
 
-  const nav = [
-    ['overview', 'Overview', Gauge], ['analyzer', 'Analyzer', Code2], ['history', 'History', LineChart], ['learn', 'Learn', BookOpen], ['settings', 'Settings', Settings],
-  ] as const;
-
-  return (
-    <div className="min-h-[100dvh] bg-[#0d1b14] text-[#e7f0d6]">
-      <aside className={`fixed inset-y-0 left-0 z-50 w-[250px] border-r border-[#294734] bg-[#10281b] p-5 transition-transform md:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="mb-10 flex items-center justify-between"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#c6ed51] text-[#183d2a]"><Leaf size={19} /></span><b>EcoDev</b></div><button className="md:hidden" onClick={() => setMobileOpen(false)}><X size={18}/></button></div>
-        <div className="mb-3 px-2 text-[10px] font-bold uppercase tracking-[0.17em] text-[#93aa96]">Workspace</div>
-        <nav className="space-y-1">{nav.map(([id, label, Icon]) => <button key={id} onClick={() => { setPage(id); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-[13px] font-semibold ${page === id ? 'bg-[#2c5b3d] text-white ring-1 ring-[#c6ed51]/20' : 'text-[#cfddc9] hover:bg-[#234c34]'}`}><Icon size={17}/><span>{label}</span>{id === 'analyzer' && <span className="ml-auto rounded bg-[#c6ed51]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#c6ed51]">LIVE</span>}</button>)}</nav>
-        <div className="mt-10 rounded-xl border border-[#31513b] bg-[#153320] p-4"><div className="mb-2 flex items-center gap-2 text-xs font-bold"><ShieldCheck size={15}/> Safe execution</div><p className="text-[11px] leading-5 text-[#a9bea9]">Runs use a restricted sandbox when Bubblewrap/Firejail is available. Without one, EcoDev fails closed and provides static analysis only.</p></div>
-      </aside>
-
-      <div className="md:pl-[250px]">
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-[#243b2d] bg-[#0d1b14]/95 px-4 py-4 backdrop-blur md:px-8"><button className="md:hidden" onClick={() => setMobileOpen(true)}><Menu size={20}/></button><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#86a18c]">Eco-efficient software engineering</p><h1 className="mt-1 text-lg font-extrabold">{page === 'analyzer' ? 'Code Analyzer' : page[0].toUpperCase()+page.slice(1)}</h1></div><div className="flex items-center gap-2 text-xs text-[#91a994]"><Zap size={15}/> dynamic measurements</div></header>
-
-        {page === 'analyzer' && <main className="mx-auto max-w-[1250px] p-4 md:p-8">
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between"><div><h2 className="text-3xl font-extrabold tracking-tight">Measure the code you actually submit.</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-[#9fb4a0]">Static analysis explains algorithmic behavior. A sandbox run measures the submitted program when a secure runtime is available. Energy and carbon remain explicitly labelled estimates.</p></div><div className="flex items-center gap-2 rounded-full border border-[#35553d] px-3 py-2 text-xs text-[#b8cab3]"><Sparkles size={14}/> No hard-coded runtime metrics</div></div>
-
-          <section className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
-            <div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5 shadow-xl"><div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><select value={language} onChange={(e) => loadSample(e.target.value)} className="rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm outline-none"><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="c">C</option><option value="cpp">C++</option><option value="go">Go</option></select><input value={fileName} onChange={(e) => setFileName(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm outline-none"/></div><button onClick={() => loadSample(language)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#36533e] px-3 py-2 text-xs font-bold hover:bg-[#193322]"><RefreshCw size={14}/> Load sample</button></div><textarea value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} className="min-h-[390px] w-full resize-y rounded-xl border border-[#294432] bg-[#09150e] p-4 font-mono text-[13px] leading-6 text-[#d8e9cf] outline-none focus:border-[#78a84a]"/><div className="mt-4 flex flex-wrap items-center gap-3"><button disabled={loading} onClick={() => analyze(false)} className="inline-flex items-center gap-2 rounded-lg bg-[#c6ed51] px-4 py-2.5 text-sm font-extrabold text-[#17301f] disabled:opacity-60">{loading ? <Loader2 className="animate-spin" size={16}/> : <Play size={16}/>} Run analysis</button><span className="text-xs text-[#8ea48f]">Max 200 KB · {languageLabels[language]}</span></div>{error && <div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm text-red-200">{error}</div>}</div>
-
-            <div className="space-y-4">
-              <MetricCard label="Runtime" value={formatMs(result?.execution?.wallTimeMs ?? null)} detail={result?.execution?.measured ? 'Measured wall time' : 'Not measured'} />
-              <MetricCard label="Peak memory" value={formatMemory(result?.execution?.peakMemoryKb ?? null)} detail={result?.execution?.measured ? 'Measured process RSS' : 'Not measured'} />
-              <MetricCard label="Energy" value={formatEnergy(result?.eco.energyWh ?? null)} detail={result?.eco.measured ? 'Measured' : 'Estimated'} />
-              <MetricCard label="Carbon" value={formatCarbon(result?.eco.carbonGrams ?? null)} detail={result?.eco.measured ? 'Measured' : 'Estimated'} />
-            </div>
-          </section>
-
-          {result && <>
-            <section className="mt-6 grid gap-4 lg:grid-cols-3"><InfoCard title="Algorithmic complexity" big={`${result.analysis.complexity.time} · ${result.analysis.complexity.space}`} body={result.analysis.complexity.basis}/><InfoCard title="Submission" big={`${result.submission.lines} lines · ${result.submission.bytes} bytes`} body={`${languageLabels[result.submission.language] ?? result.submission.language} · detection ${result.submission.detectionConfidence}`}/><InfoCard title="Execution status" big={result.execution?.status ?? result.compile?.status ?? 'not run'} body={result.execution?.sandbox ? `Sandbox: ${result.execution.sandbox}` : 'Static analysis only'}/></section>
-
-            <section className="mt-6 rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="font-bold">Findings & hotspots</h3><p className="text-xs text-[#91a994]">Based on this exact submission.</p></div><span className="rounded-full bg-[#c6ed51]/10 px-3 py-1 text-xs font-bold text-[#c6ed51]">Score {result.analysis.score}/100</span></div><div className="space-y-3">{result.analysis.findings.map((f, i) => <div key={i} className="rounded-xl border border-[#294432] bg-[#0b1810] p-4"><div className="flex gap-3"><span className="mt-1 h-2 w-2 rounded-full bg-[#c6ed51]"/><div><div className="text-sm font-bold">{f.title}</div><div className="mt-1 text-sm leading-6 text-[#a3b7a4]">{f.detail}</div><div className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[#718777]">{f.severity}</div></div></div></div>)}</div></section>
-
-            <section className="mt-6 rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><div className="mb-4"><h3 className="font-bold">Optimization options</h3><p className="text-xs text-[#91a994]">Compare trade-offs instead of forcing a single “best” answer.</p></div><div className="grid gap-4 lg:grid-cols-3">{result.analysis.alternatives.map((alt) => <button key={alt.id} onClick={() => setSelectedAlt(alt.id)} className={`text-left rounded-xl border p-4 transition ${selectedAlt === alt.id ? 'border-[#91ba55] bg-[#173321]' : 'border-[#294432] bg-[#0b1810] hover:bg-[#132619]'}`}><div className="mb-2 flex items-center justify-between"><span className="text-sm font-bold">{alt.title}</span>{selectedAlt === alt.id && <Check size={16}/>}</div><p className="text-xs leading-5 text-[#a4b8a4]">{alt.description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-[#8fa590]"><span>Complexity: {alt.complexity}</span><span>Memory: {alt.expectedMemoryChange}</span><span>Speed: {alt.expectedRuntimeChange}</span><span>Simple: {alt.simplicity}</span><span>Readable: {alt.readability}</span><span>Portable: {alt.portability}</span></div></button>)}</div></section>
-
-            {currentAlternative && <section className="mt-6 grid gap-5 xl:grid-cols-2"><div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><div className="flex items-center justify-between"><div><h3 className="font-bold">Selected option: {currentAlternative.title}</h3><p className="mt-1 text-xs text-[#91a994]">Use the generated variant when available, then benchmark it.</p></div>{currentAlternative.code && <button onClick={useAlternative} className="inline-flex items-center gap-2 rounded-lg border border-[#36533e] px-3 py-2 text-xs font-bold"><Save size={14}/> Copy to compare</button>}</div><div className="mt-4 grid gap-2 text-xs text-[#a6baa6]"><div><b className="text-[#d6e7d0]">Maintainability:</b> {currentAlternative.maintainability}</div><div><b className="text-[#d6e7d0]">Readability:</b> {currentAlternative.readability}</div><div><b className="text-[#d6e7d0]">Portability:</b> {currentAlternative.portability}</div><div><b className="text-[#d6e7d0]">Energy:</b> {currentAlternative.projectedEnergyChange}</div><div><b className="text-[#d6e7d0]">Carbon:</b> {currentAlternative.projectedCarbonChange}</div></div></div><div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><h3 className="font-bold">Before / after benchmark</h3><p className="mt-1 text-xs text-[#91a994]">Paste or edit the candidate implementation. The server runs it as a separate submission.</p><textarea value={candidateCode} onChange={(e) => setCandidateCode(e.target.value)} spellCheck={false} placeholder="Candidate code goes here…" className="mt-4 min-h-[180px] w-full rounded-xl border border-[#294432] bg-[#09150e] p-3 font-mono text-xs leading-5 outline-none"/><button disabled={!candidateCode.trim() || compareLoading} onClick={() => analyze(true)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#7ca34a] px-4 py-2 text-xs font-bold disabled:opacity-50">{compareLoading ? <Loader2 className="animate-spin" size={14}/> : <LineChart size={14}/>} Test candidate</button></div></section>}
-
-            {result.comparison && <section className="mt-6 grid gap-4 md:grid-cols-4"><InfoCard title="Runtime delta" big={result.comparison.delta.runtimePercent == null ? 'Unavailable' : `${result.comparison.delta.runtimePercent > 0 ? '+' : ''}${result.comparison.delta.runtimePercent.toFixed(2)}%`} body={`${formatMs(result.comparison.delta.runtimeMs)} vs baseline`}/><InfoCard title="Memory delta" big={result.comparison.delta.peakMemoryKb == null ? 'Unavailable' : formatMemory(result.comparison.delta.peakMemoryKb)} body="Candidate minus baseline"/><InfoCard title="Carbon delta" big={result.comparison.delta.carbonGrams == null ? 'Unavailable' : `${result.comparison.delta.carbonGrams > 0 ? '+' : ''}${result.comparison.delta.carbonGrams.toFixed(6)} g`} body="Estimated difference"/><InfoCard title="Candidate status" big={result.comparison.execution?.status ?? 'Unavailable'} body="Independent candidate run"/></section>}
-
-            <section className="mt-6 rounded-xl border border-[#294432] bg-[#0b1810] p-4 text-xs leading-5 text-[#91a994]"><b className="text-[#d8ead1]">Eco model:</b> {result.eco.basis} Default assumptions: {result.eco.assumptions.cpuPackageWatts} W CPU-package power and {result.eco.assumptions.carbonIntensityGPerKwh} gCO₂e/kWh. These are configurable estimates, not a direct carbon meter.</section>
-            {(result.compile?.stderr || result.execution?.stderr) && <section className="mt-4 rounded-xl border border-red-900/40 bg-red-950/20 p-4"><div className="text-sm font-bold text-red-200">Compiler/runtime output</div><pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap text-xs text-red-100/80">{result.compile?.stderr || result.execution?.stderr}</pre></section>}
-          </>}
-        </main>}
-
-        {page === 'overview' && <SimplePage title="Overview" text="EcoDev now measures submitted code through the same analyzer API used by the Analyzer page. Open Analyzer to run a real submission." onClick={() => setPage('analyzer')} />}
-        {page === 'history' && <HistoryPage history={history} />}
-        {page === 'learn' && <SimplePage title="Learn" text="Complexity is inferred from source structure; runtime and memory are measured only when the sandbox can execute the submission. Energy and carbon are model estimates unless a hardware energy meter is integrated." />}
-        {page === 'settings' && <SimplePage title="Settings" text="Sandbox limits are controlled by server environment variables: execution timeout, memory cap, process count, CPU power assumption, and grid carbon intensity." />}
-      </div>
+  return <div className="min-h-[100dvh] bg-[#0d1b14] text-[#e7f0d6]">
+    <aside className={`fixed inset-y-0 left-0 z-50 w-[250px] border-r border-[#294734] bg-[#10281b] p-5 transition-transform md:translate-x-0 ${mobileOpen?'translate-x-0':'-translate-x-full'}`}>
+      <div className="mb-10 flex items-center justify-between"><div className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#c6ed51] text-[#183d2a]"><Leaf size={19}/></span><b>EcoDev</b></div><button className="md:hidden" onClick={()=>setMobileOpen(false)}><X size={18}/></button></div>
+      <div className="mb-3 px-2 text-[10px] font-bold uppercase tracking-[0.17em] text-[#93aa96]">Workspace</div>
+      <nav className="space-y-1">{nav.map(([id,label,Icon])=><button key={id} onClick={()=>{setPage(id);setMobileOpen(false)}} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-[13px] font-semibold ${page===id?'bg-[#2c5b3d] text-white':'text-[#cfddc9] hover:bg-[#234c34]'}`}><Icon size={17}/><span>{label}</span>{id==='analyzer'&&<span className="ml-auto rounded bg-[#c6ed51]/15 px-1.5 py-0.5 font-mono text-[9px] text-[#c6ed51]">LIVE</span>}</button>)}</nav>
+      <div className="mt-10 rounded-xl border border-[#31513b] bg-[#153320] p-4"><div className="mb-2 flex items-center gap-2 text-xs font-bold"><ShieldCheck size={15}/> Secure execution</div><p className="text-[11px] leading-5 text-[#a9bea9]">Execution is fail-closed unless Bubblewrap or Firejail is available. Static security checks run independently.</p></div>
+    </aside>
+    <div className="md:pl-[250px]">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-[#243b2d] bg-[#0d1b14]/95 px-4 py-4 backdrop-blur md:px-8"><button className="md:hidden" onClick={()=>setMobileOpen(true)}><Menu size={20}/></button><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#86a18c]">Eco-efficient software engineering</p><h1 className="mt-1 text-lg font-extrabold">{page[0].toUpperCase()+page.slice(1)}</h1></div><div className="flex items-center gap-2 text-xs text-[#91a994]"><Zap size={15}/> measured when available</div></header>
+      {page==='analyzer'&&<main className="mx-auto max-w-[1280px] p-4 md:p-8">
+        <div className="mb-6"><h2 className="text-3xl font-extrabold tracking-tight">Analyze, execute, optimize, and verify.</h2><p className="mt-2 max-w-3xl text-sm leading-6 text-[#9fb4a0]">EcoDev combines static complexity, security checks, sandboxed execution, benchmark statistics, optimization alternatives, green-computing estimates, and an optional AI coach. Measurements are never presented as guesses.</p></div>
+        <section className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
+          <div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5 shadow-xl">
+            <div className="mb-4 grid gap-3 sm:grid-cols-[auto_1fr_auto_auto]"><select value={language} onChange={e=>loadSample(e.target.value)} className="rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm"><option value="javascript">JavaScript</option><option value="typescript">TypeScript</option><option value="python">Python</option><option value="c">C</option><option value="cpp">C++</option><option value="go">Go</option></select><input value={fileName} onChange={e=>setFileName(e.target.value)} className="rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm"/><label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#36533e] px-3 py-2 text-xs font-bold"><Upload size={14}/> Import<input type="file" className="hidden" onChange={importFile}/></label><button onClick={()=>loadSample(language)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#36533e] px-3 py-2 text-xs font-bold"><RefreshCw size={14}/> Sample</button></div>
+            <textarea value={code} onChange={e=>setCode(e.target.value)} spellCheck={false} className="min-h-[390px] w-full resize-y rounded-xl border border-[#294432] bg-[#09150e] p-4 font-mono text-[13px] leading-6 text-[#d8e9cf] outline-none focus:border-[#78a84a]"/>
+            <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto_auto]"><select value={profile} onChange={e=>setProfile(e.target.value)} className="rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm">{profiles.map(p=><option key={p} value={p}>{p} profile</option>)}</select><select value={iterations} onChange={e=>setIterations(Number(e.target.value))} className="rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm"><option value={1}>1 run</option><option value={3}>3 runs</option><option value={5}>5 runs</option></select><button disabled={coachLoading} onClick={runCoach} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#36533e] px-4 py-2.5 text-sm font-bold">{coachLoading?<Loader2 className="animate-spin" size={16}/>:<Sparkles size={16}/>} Coach</button><button disabled={loading} onClick={analyze} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#c6ed51] px-5 py-2.5 text-sm font-extrabold text-[#17301f] disabled:opacity-60">{loading?<Loader2 className="animate-spin" size={16}/>:<Play size={16}/>} Analyze</button></div>
+            <input value={instruction} onChange={e=>setInstruction(e.target.value)} placeholder="Optimization goal, e.g. minimize memory without hurting runtime" className="mt-3 w-full rounded-lg border border-[#36533e] bg-[#142b1e] px-3 py-2 text-sm"/>
+            {error&&<div className="mt-4 rounded-lg border border-red-900/50 bg-red-950/30 p-3 text-sm text-red-200">{error}</div>}
+          </div>
+          <div className="space-y-4"><MetricCard label="Runtime" value={ms(result?.execution?.wallTimeMs)} detail={result?.execution?.measured?'Measured wall time':'Not measured'}/><MetricCard label="CPU time" value={ms(result?.execution?.cpuTimeMs)} detail="Process CPU when available"/><MetricCard label="Peak memory" value={memory(result?.execution?.peakMemoryKb)} detail="Maximum resident set"/><MetricCard label="Energy / carbon" value={energy(result?.eco.energyWh)} detail={`${carbon(result?.eco.carbonGrams)} · estimate`}/></div>
+        </section>
+        {result&&<div className="mt-6 space-y-5">
+          <section className="grid gap-4 lg:grid-cols-4"><InfoCard title="Efficiency score" big={`${result.analysis.score}/100`} body={`${labels[result.submission.language]} · ${result.submission.lines} lines`}/><InfoCard title="Complexity" big={result.analysis.complexity.time} body={result.analysis.complexity.space}/><InfoCard title="Security" big={`${result.security.score}/100`} body="Static defensive checks"/><InfoCard title="Execution" big={result.execution?.status??result.compile?.status??'not run'} body={result.execution?.sandbox??'Static only'}/></section>
+          <section className="grid gap-5 lg:grid-cols-2"><Panel title="Findings & security"><div className="space-y-3">{[...result.analysis.findings,...result.security.findings].map((f,i)=><div key={i} className="rounded-xl border border-[#294432] bg-[#0b1810] p-4"><div className="text-sm font-bold">{f.title}</div><div className="mt-1 text-sm leading-6 text-[#a3b7a4]">{f.detail}</div><span className="mt-2 inline-block text-[10px] font-bold uppercase tracking-wider text-[#718777]">{f.severity}</span></div>)}</div></Panel><Panel title="Program output"><pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl bg-[#09150e] p-4 font-mono text-xs leading-5 text-[#bcd1ba]">{result.execution?.stdout||result.execution?.stderr||result.compile?.stderr||'No output.'}</pre></Panel></section>
+          <Panel title="Optimization alternatives"><div className="grid gap-3 md:grid-cols-2">{result.analysis.alternatives.map(a=><button key={a.id} onClick={()=>{setCandidate(a.id);if(a.code)setCode(a.code)}} className="rounded-xl border border-[#294432] bg-[#0b1810] p-4 text-left hover:border-[#78a84a]"><div className="flex items-center justify-between"><b>{a.title}</b><span className="text-[10px] text-[#c6ed51]">{a.complexity}</span></div><p className="mt-2 text-sm leading-6 text-[#a3b7a4]">{a.description}</p><div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-[#8fa690]"><span>Runtime: {a.expectedRuntimeChange}</span><span>Memory: {a.expectedMemoryChange}</span><span>Energy: {a.projectedEnergyChange}</span><span>Carbon: {a.projectedCarbonChange}</span></div></button>)}</div></Panel>
+          {result.comparison&&<Panel title="Before / after verification"><div className="grid gap-3 md:grid-cols-4"><InfoCard title="Runtime delta" big={ms(result.comparison.delta.runtimeMs)} body={`${result.comparison.delta.runtimePercent??'n/a'}%`}/><InfoCard title="Memory delta" big={memory(result.comparison.delta.peakMemoryKb)} body="candidate − baseline"/><InfoCard title="Carbon delta" big={carbon(result.comparison.delta.carbonGrams)} body="modeled change"/><InfoCard title="Candidate" big={result.comparison.execution?.status??'n/a'} body="sandbox result"/></div></Panel>}
+          <div className="flex flex-wrap gap-2"><button onClick={()=>downloadReport('markdown')} className="inline-flex items-center gap-2 rounded-lg border border-[#36533e] px-3 py-2 text-xs font-bold"><Download size={14}/> Markdown report</button><button onClick={()=>downloadReport('json')} className="inline-flex items-center gap-2 rounded-lg border border-[#36533e] px-3 py-2 text-xs font-bold"><Download size={14}/> JSON report</button></div>
+        </div>}
+        {coach&&<div className="mt-5"><Panel title={`Code Coach · ${coach.provider}`}><p className="text-sm leading-6 text-[#c1d2bf]">{coach.summary}</p><div className="mt-4 grid gap-4 md:grid-cols-2"><div><b className="text-xs uppercase tracking-wider text-[#c6ed51]">Recommendations</b><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-[#a3b7a4]">{coach.recommendations.map((x,i)=><li key={i}>{x}</li>)}</ul></div><div><b className="text-xs uppercase tracking-wider text-[#c6ed51]">Validation plan</b><ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-[#a3b7a4]">{coach.nextTests.map((x,i)=><li key={i}>{x}</li>)}</ul></div></div></Panel></div>}
+      </main>}
+      {page==='overview'&&<main className="mx-auto max-w-[1100px] p-4 md:p-8"><h2 className="text-3xl font-extrabold">EcoDev control center</h2><p className="mt-2 text-[#9fb4a0]">A real engineering workflow: analyze → benchmark → optimize → verify → report.</p><div className="mt-6 grid gap-4 md:grid-cols-3"><InfoCard title="Supported languages" big="6" body="JS · TS · Python · C · C++ · Go"/><InfoCard title="Optimization profiles" big="7" body="Balanced · fast · memory · green · reliable · secure · scalable"/><InfoCard title="History" big={String(history.length)} body="Saved locally in this browser"/></div></main>}
+      {page==='history'&&<main className="mx-auto max-w-[1100px] p-4 md:p-8"><h2 className="text-3xl font-extrabold">Analysis history</h2><div className="mt-6 space-y-3">{history.length?history.map((r,i)=><button key={i} onClick={()=>{setResult(r);setLanguage(r.submission.language);setPage('analyzer')}} className="w-full rounded-xl border border-[#2b4634] bg-[#102318] p-4 text-left"><div className="flex justify-between"><b>{labels[r.submission.language]??r.submission.language}</b><span className="text-[#c6ed51]">{r.analysis.score}/100</span></div><p className="mt-1 text-xs text-[#91a994]">{r.submission.lines} lines · {ms(r.execution?.wallTimeMs)} · {carbon(r.eco.carbonGrams)}</p></button>):<p className="text-[#91a994]">Run an analysis to create history.</p>}</div></main>}
+      {page==='learn'&&<main className="mx-auto max-w-[1100px] p-4 md:p-8"><h2 className="text-3xl font-extrabold">Green engineering guide</h2><div className="mt-6 grid gap-4 md:grid-cols-2"><InfoCard title="Measure first" big="Baseline" body="Use representative inputs and repeated runs. Do not optimize from static guesses alone."/><InfoCard title="Algorithmic efficiency" big="Big-O" body="Reduce repeated scans, unnecessary sorts, allocations, and recursive recomputation when the workload justifies it."/><InfoCard title="Energy model" big="CPU × watts" body="EcoDev estimates energy from measured CPU time and a configurable CPU-package power assumption."/><InfoCard title="Carbon model" big="Energy × grid" body="Carbon is modeled with configurable grid intensity and is explicitly labeled as an estimate."/></div></main>}
+      {page==='settings'&&<main className="mx-auto max-w-[1100px] p-4 md:p-8"><h2 className="text-3xl font-extrabold">Settings</h2><div className="mt-6 rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><div className="flex items-center gap-2 font-bold"><FileCode2 size={18}/> Runtime policy</div><p className="mt-2 text-sm leading-6 text-[#9fb4a0]">Default server limits: {result?.limits.timeoutMs??5000} ms timeout, {result?.limits.memoryMb??256} MB memory, {result?.limits.processLimit??32} processes. Execution remains fail-closed when the sandbox runtime is unavailable.</p><div className="mt-4 flex items-center gap-2 text-xs text-[#c6ed51]"><Check size={14}/> No host shell commands from user source</div></div></main>}
     </div>
-  );
+  </div>;
 }
-
-function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><div className="text-xs text-[#8fa48f]">{label}</div><div className="mt-2 text-2xl font-extrabold tracking-tight">{value}</div><div className="mt-1 text-[11px] text-[#718676]">{detail}</div></div>; }
-function InfoCard({ title, big, body }: { title: string; big: string; body: string }) { return <div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><div className="text-xs text-[#8fa48f]">{title}</div><div className="mt-2 text-xl font-extrabold">{big}</div><div className="mt-2 text-xs leading-5 text-[#8fa48f]">{body}</div></div>; }
-function SimplePage({ title, text, onClick }: { title: string; text: string; onClick?: () => void }) { return <main className="mx-auto max-w-3xl p-6 md:p-12"><div className="rounded-2xl border border-[#2b4634] bg-[#102318] p-8"><h2 className="text-3xl font-extrabold">{title}</h2><p className="mt-4 text-sm leading-7 text-[#9fb4a0]">{text}</p>{onClick && <button onClick={onClick} className="mt-6 rounded-lg bg-[#c6ed51] px-4 py-2 text-sm font-bold text-[#17301f]">Open Analyzer</button>}</div></main>; }
-function HistoryPage({ history }: { history: AnalysisResponse[] }) { return <main className="mx-auto max-w-5xl p-6 md:p-10"><h2 className="text-3xl font-extrabold">Recent analyses</h2><div className="mt-6 space-y-3">{history.length === 0 ? <div className="rounded-xl border border-[#2b4634] bg-[#102318] p-6 text-sm text-[#91a994]">No analyses in this session yet.</div> : history.map((item, i) => <div key={i} className="rounded-xl border border-[#2b4634] bg-[#102318] p-5"><div className="flex flex-wrap items-center justify-between gap-2"><b>{languageLabels[item.submission.language] ?? item.submission.language}</b><span className="text-xs text-[#91a994]">{item.submission.lines} lines · {formatMs(item.execution?.wallTimeMs ?? null)}</span></div><div className="mt-2 text-sm text-[#a3b6a3]">{item.analysis.complexity.time} · {item.analysis.complexity.space}</div></div>)}</div></main>; }
+function MetricCard({label,value,detail}:{label:string;value:string;detail:string}){return <div className="rounded-xl border border-[#2b4634] bg-[#102318] p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-[#78907d]">{label}</div><div className="mt-2 text-xl font-extrabold">{value}</div><div className="mt-1 text-[11px] text-[#8ea48f]">{detail}</div></div>}
+function InfoCard({title,big,body}:{title:string;big:string;body:string}){return <div className="rounded-xl border border-[#2b4634] bg-[#102318] p-4"><div className="text-[10px] font-bold uppercase tracking-wider text-[#78907d]">{title}</div><div className="mt-2 text-lg font-extrabold">{big}</div><div className="mt-1 text-xs leading-5 text-[#8ea48f]">{body}</div></div>}
+function Panel({title,children}:{title:string;children:ReactNode}){return <section className="rounded-2xl border border-[#2b4634] bg-[#102318] p-5"><h3 className="mb-4 font-bold">{title}</h3>{children}</section>}
