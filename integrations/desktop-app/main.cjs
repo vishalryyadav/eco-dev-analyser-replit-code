@@ -1,22 +1,19 @@
 const { app, BrowserWindow, session } = require('electron');
 const os = require('node:os');
 const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 
 const exec = promisify(execFile);
-const PORT = Number(process.env.ECODEV_AGENT_PORT || 17777);
+const AGENT_PORT = Number(process.env.ECODEV_AGENT_PORT || 17777);
+const API_PORT = Number(process.env.ECODEV_DESKTOP_API_PORT || 5180);
 
-async function run(command, args) {
-  try { return (await exec(command, args, { timeout: 2000, windowsHide: true })).stdout; } catch { return ''; }
-}
+async function run(command, args) { try { return (await exec(command, args, { timeout: 2000, windowsHide: true })).stdout; } catch { return ''; } }
 async function battery() {
-  if (process.platform === 'linux') {
-    const output = await run('sh', ['-c', 'for f in /sys/class/power_supply/BAT*/capacity; do cat $f; break; done']);
-    const status = await run('sh', ['-c', 'for f in /sys/class/power_supply/BAT*/status; do cat $f; break; done']);
-    const n = Number(output.trim());
-    return Number.isFinite(n) ? { percent: Math.max(0, Math.min(100, n)), charging: /charging/i.test(status) } : { percent: null, charging: null };
-  }
+  if (process.platform === 'linux') { const output = await run('sh', ['-c', 'for f in /sys/class/power_supply/BAT*/capacity; do cat $f; break; done']); const status = await run('sh', ['-c', 'for f in /sys/class/power_supply/BAT*/status; do cat $f; break; done']); const n = Number(output.trim()); return Number.isFinite(n) ? { percent: Math.max(0, Math.min(100, n)), charging: /charging/i.test(status) } : { percent: null, charging: null }; }
   if (process.platform === 'darwin') { const output = await run('pmset', ['-g', 'batt']); const match = output.match(/(\d+)%/); return { percent: match ? Number(match[1]) : null, charging: /AC Power/i.test(output) }; }
   if (process.platform === 'win32') { const output = await run('powershell', ['-NoProfile', '-Command', 'Get-CimInstance Win32_Battery | Select-Object -First 1 EstimatedChargeRemaining,BatteryStatus | ConvertTo-Json -Compress']); try { const value = JSON.parse(output); return { percent: Number(value.EstimatedChargeRemaining), charging: Number(value.BatteryStatus) === 2 }; } catch { return { percent: null, charging: null }; } }
   return { percent: null, charging: null };
@@ -38,27 +35,31 @@ async function deviceSnapshot() {
 }
 function startAgent() {
   const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS' };
-  const server = http.createServer(async (req, res) => {
-    if (req.method === 'OPTIONS') { res.writeHead(204, headers); return res.end(); }
-    if (req.method === 'GET' && req.url === '/healthz') { res.writeHead(200, headers); return res.end(JSON.stringify({ ok: true, service: 'ecodev-desktop-agent' })); }
-    if (req.method === 'GET' && req.url === '/v1/device') { res.writeHead(200, headers); return res.end(JSON.stringify(await deviceSnapshot())); }
-    res.writeHead(404, headers); res.end(JSON.stringify({ error: 'not found' }));
-  });
-  server.listen(PORT, '127.0.0.1');
-  app.on('before-quit', () => server.close());
+  const server = http.createServer(async (req, res) => { if (req.method === 'OPTIONS') { res.writeHead(204, headers); return res.end(); } if (req.method === 'GET' && req.url === '/healthz') { res.writeHead(200, headers); return res.end(JSON.stringify({ ok: true, service: 'ecodev-desktop-agent' })); } if (req.method === 'GET' && req.url === '/v1/device') { res.writeHead(200, headers); return res.end(JSON.stringify(await deviceSnapshot())); } res.writeHead(404, headers); res.end(JSON.stringify({ error: 'not found' })); });
+  server.listen(AGENT_PORT, '127.0.0.1'); app.on('before-quit', () => server.close());
 }
-
-function createWindow() {
+async function startEmbeddedApi() {
+  const embedded = path.join(__dirname, 'embedded');
+  const apiFile = path.join(embedded, 'api.mjs');
+  const webDir = path.join(embedded, 'web');
+  if (!fs.existsSync(apiFile) || !fs.existsSync(path.join(webDir, 'index.html'))) return null;
+  process.env.PORT = String(API_PORT);
+  process.env.ECODEV_FRONTEND_DIST = webDir;
+  await import(pathToFileURL(apiFile).href);
+  return `http://127.0.0.1:${API_PORT}`;
+}
+function createWindow(url) {
   const win = new BrowserWindow({ width: 1360, height: 900, minWidth: 1000, minHeight: 700, backgroundColor: '#0d1b14', webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false } });
-  const url = process.env.ECODEV_WEB_URL || 'http://localhost:5000';
   win.loadURL(url);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   startAgent();
-  createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-});
+  const localUrl = await startEmbeddedApi();
+  const url = process.env.ECODEV_WEB_URL || localUrl || 'http://localhost:5000';
+  createWindow(url);
+  app.on('activate', async () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(process.env.ECODEV_WEB_URL || localUrl || 'http://localhost:5000'); });
+}).catch((error) => { console.error('EcoDev desktop startup failed', error); app.quit(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
