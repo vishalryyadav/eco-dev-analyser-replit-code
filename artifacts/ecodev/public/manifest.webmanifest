@@ -1,0 +1,13 @@
+{
+  "name": "EcoDev Code Analyzer",
+  "short_name": "EcoDev",
+  "description": "Code performance, security and green-computing analysis for developers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0d1b14",
+  "theme_color": "#0d1b14",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
