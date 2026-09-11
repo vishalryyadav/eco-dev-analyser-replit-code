@@ -25,6 +25,46 @@ jobs:
         run: pnpm --filter @workspace/api-server typecheck
       - name: Test API
         run: pnpm --filter @workspace/api-server test
+      - name: Build API
+        run: pnpm --filter @workspace/api-server build
+
+  validate-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Typecheck frontend
+        run: pnpm --filter @workspace/ecodev typecheck
+      - name: Build frontend
+        run: pnpm --filter @workspace/ecodev build
+
+  validate-replit-startup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Validate startup script syntax
+        run: sh -n scripts/replit-start.sh scripts/check-runtime.sh
+      - name: Typecheck workspace libraries
+        run: pnpm run typecheck:libs
+      - name: Build frontend
+        run: pnpm --filter @workspace/ecodev build
+      - name: Build API
+        run: pnpm --filter @workspace/api-server build
 
   validate-vscode-extension:
     runs-on: ubuntu-latest
