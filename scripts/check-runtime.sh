@@ -15,7 +15,6 @@ if command -v bwrap >/dev/null 2>&1; then
 elif command -v firejail >/dev/null 2>&1; then
   echo 'OK: firejail'
 else
-  echo 'ERROR: neither bubblewrap nor firejail is available; secure execution will be disabled.'
-  exit 2
+  echo 'WARN: neither bubblewrap nor firejail is available; secure code execution will be disabled and static analysis will remain available.'
 fi
 node -e 'console.log("Node", process.version)'
