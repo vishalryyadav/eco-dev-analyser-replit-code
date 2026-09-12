@@ -43,3 +43,8 @@ test("submission size metadata is dynamic", () => {
   assert.equal(result.lines, 2);
   assert.equal(result.bytes, Buffer.byteLength(source, "utf8"));
 });
+
+test("flags a source file that ends with an unfinished control statement", () => {
+  const result = analyzeCode("int main(void) {\n  if (data == NULL)", "c");
+  assert.ok(result.findings.some((item) => item.title === "Source appears incomplete"));
+});

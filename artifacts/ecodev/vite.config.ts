@@ -13,6 +13,7 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 const basePath = process.env.BASE_PATH ?? '/';
+const apiOrigin = process.env.ECODEV_API_ORIGIN ?? 'http://127.0.0.1:4310';
 
 export default defineConfig({
   base: basePath,
@@ -56,6 +57,10 @@ export default defineConfig({
     strictPort: true,
     host: '0.0.0.0',
     allowedHosts: true,
+    proxy: {
+      '/api': { target: apiOrigin, changeOrigin: true },
+      '/healthz': { target: apiOrigin, changeOrigin: true },
+    },
     fs: {
       strict: true,
     },

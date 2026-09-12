@@ -11,6 +11,8 @@ This branch adds the missing product layers around the core analyzer: developer 
 - Set `ECODEV_RATE_LIMIT` and `ECODEV_RATE_WINDOW_MS` to match expected legitimate traffic and infrastructure capacity.
 - Do not disable the sandbox or add an unsandboxed escape hatch.
 - Verify Bubblewrap is available and that the deployment platform permits the required Linux user namespaces. If not, use a dedicated code-execution worker rather than running untrusted source in the web process.
+- Vercel is suitable for the web/API surface but is not assumed to provide secure arbitrary-code execution. Use `deploy/Dockerfile.sandbox` on a Linux container host for measured compiler/runtime execution.
+- Copy `.env.example` to `.env` and review every limit and scenario-model input before deployment.
 
 ### Measurement
 
@@ -46,3 +48,12 @@ A release is production-ready only after the deployment-specific smoke test demo
 7. VS Code commands work against the configured API.
 8. The desktop agent is optional and does not upload telemetry by itself.
 9. The CI pipeline is green for API, extension, and desktop-agent checks.
+
+### Local production container
+
+```powershell
+Copy-Item .env.example .env
+docker compose -f docker-compose.production.yml up --build
+```
+
+The release endpoint is `http://localhost:5000`; stop it with `docker compose -f docker-compose.production.yml down`.

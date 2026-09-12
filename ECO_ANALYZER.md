@@ -12,18 +12,18 @@ JavaScript, TypeScript, Python, C, C++, and Go.
 - **CPU time**: measured from GNU `time -v` output when the runtime image provides it; otherwise the successful-run value may fall back to wall time and is labelled accordingly.
 - **Peak memory**: measured from maximum resident set size when GNU `time -v` is available.
 - **Time/space complexity**: static structural inference. It is not a measurement and cannot prove arbitrary-program complexity.
-- **Energy**: estimated from measured process CPU time and a configurable CPU-package power assumption.
-- **Carbon**: estimated as energy in kWh multiplied by configured grid carbon intensity.
+- **Energy**: estimated from measured process CPU time (or measured wall time when CPU telemetry is unavailable) and a documented low/high CPU-package power scenario.
+- **Carbon**: estimated as energy in kWh multiplied by a documented low/high grid carbon-intensity scenario.
 
 Defaults are explicit and configurable:
 
-- `ECODEV_CPU_WATTS=25`
-- `ECODEV_CARBON_G_PER_KWH=400`
+- `ECODEV_CPU_WATTS_LOW=15` and `ECODEV_CPU_WATTS_HIGH=45`
+- `ECODEV_CARBON_G_PER_KWH_LOW=100` and `ECODEV_CARBON_G_PER_KWH_HIGH=800`
 - `ECODEV_EXEC_TIMEOUT_MS=5000`
 - `ECODEV_EXEC_MEMORY_MB=256`
 - `ECODEV_EXEC_PIDS=32`
 
-EcoDev never labels modeled energy/carbon as directly measured. A hardware meter can replace the estimate later.
+EcoDev never labels modeled energy/carbon as directly measured. The API returns a scenario range, midpoint, input telemetry, methodology, and source links. Configure measured device power and location/time-specific grid data to narrow the range. SCI also requires a functional unit and embodied emissions for a complete SCI score; this per-run report does not claim to be a full SCI score.
 
 ## Benchmarking
 

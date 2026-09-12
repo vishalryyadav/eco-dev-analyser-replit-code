@@ -1,0 +1,19 @@
+services:
+  ecodev:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.sandbox
+    image: ecodev-production:local
+    ports:
+      - "5000:5000"
+    mem_limit: 1g
+    pids_limit: 128
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777,exec
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined
+    cap_add:
+      - SYS_ADMIN

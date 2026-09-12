@@ -24,7 +24,7 @@ const definitions: Record<SupportedLanguage, Definition> = {
   javascript: { source: "main.js", compile: null, run: ["node", "main.js"] },
   typescript: { source: "main.ts", compile: ["tsc", "main.ts", "--target", "ES2022", "--module", "commonjs", "--outDir", "build", "--pretty", "false"], run: ["node", "build/main.js"] },
   python: { source: "main.py", compile: null, run: ["python3", "-I", "main.py"] },
-  c: { source: "main.c", compile: ["gcc", "-O2", "-std=c11", "main.c", "-o", "main"], run: ["./main"] },
+  c: { source: "main.c", compile: ["gcc", "-O2", "-std=c11", "-D_POSIX_C_SOURCE=200809L", "main.c", "-o", "main", "-lm"], run: ["./main"] },
   cpp: { source: "main.cpp", compile: ["g++", "-O2", "-std=c++17", "main.cpp", "-o", "main"], run: ["./main"] },
   go: { source: "main.go", compile: ["go", "build", "-o", "main", "main.go"], run: ["./main"] },
 };
@@ -62,7 +62,7 @@ function commandLine(args: string[]) {
 
 function buildCommand(runtime: "bubblewrap" | "firejail", args: string[], cwd: string) {
   const command = commandLine(args);
-  const limited = `ulimit -v ${MEMORY_MB * 1024}; ulimit -u ${PIDS}; if [ -x /usr/bin/time ]; then /usr/bin/time -v sh -c ${quote(command)}; else sh -c ${quote(command)}; fi`;
+  const limited = `if [ -x /usr/bin/time ]; then /usr/bin/time -v sh -c ${quote(command)}; else sh -c ${quote(command)}; fi`;
 
   if (runtime === "bubblewrap") {
     const binds: string[] = [

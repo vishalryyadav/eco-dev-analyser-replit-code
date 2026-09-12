@@ -1,19 +1,25 @@
 FROM node:24-bookworm-slim
 
 ENV NODE_ENV=production \
-    PATH=/usr/local/bin:/usr/bin:/bin
+  PATH=/usr/local/bin:/usr/bin:/bin \
+  PORT=5000 \
+  ECODEV_EXEC_MEMORY_MB=1024
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends bubblewrap gcc g++ golang-go python3 ca-certificates time \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json tsconfig.base.json ./
 COPY lib ./lib
+COPY scripts ./scripts
 COPY artifacts/api-server ./artifacts/api-server
+COPY artifacts/ecodev ./artifacts/ecodev
 
-RUN corepack enable && pnpm install --frozen-lockfile \
+RUN corepack enable && corepack prepare pnpm@10.15.1 --activate && pnpm install --frozen-lockfile \
   && pnpm run typecheck:libs \
+  && pnpm --filter @workspace/ecodev typecheck \
+  && pnpm --filter @workspace/ecodev build \
   && pnpm --filter @workspace/api-server typecheck \
   && pnpm --filter @workspace/api-server build \
   && pnpm store prune
