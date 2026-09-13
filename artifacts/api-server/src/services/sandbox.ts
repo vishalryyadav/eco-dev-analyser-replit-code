@@ -1,10 +1,10 @@
 import { execFile, spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, constants, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { SupportedLanguage } from "./analyzer";
 
-export type ExecutionStatus = "completed" | "compile_error" | "runtime_error" | "timeout" | "sandbox_unavailable";
+export type ExecutionStatus = "completed" | "compile_error" | "runtime_error" | "timeout" | "output_limit" | "sandbox_unavailable";
 export type ExecutionResult = {
   status: ExecutionStatus;
   stdout: string;
@@ -40,15 +40,16 @@ const PIDS = Math.max(8, Math.min(128, positiveNumber("ECODEV_EXEC_PIDS", 32)));
 const WORK_ROOT = process.env.ECODEV_WORK_ROOT || tmpdir();
 const OUTPUT_LIMIT = 32_000;
 
-function commandExists(command: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    execFile("sh", ["-c", `command -v ${command} >/dev/null 2>&1`], { timeout: 1_000 }, (error) => resolve(!error));
-  });
+async function executableAvailable(paths: string[]) {
+  for (const candidate of paths) {
+    try { await access(candidate, constants.X_OK); return true; } catch {}
+  }
+  return false;
 }
 
 async function findSandbox() {
-  if (await commandExists("bwrap")) return "bubblewrap" as const;
-  if (await commandExists("firejail")) return "firejail" as const;
+  if (await executableAvailable(["/usr/bin/bwrap", "/bin/bwrap", "/usr/local/bin/bwrap"])) return "bubblewrap" as const;
+  if (await executableAvailable(["/usr/bin/firejail", "/bin/firejail", "/usr/local/bin/firejail"])) return "firejail" as const;
   return null;
 }
 
@@ -62,7 +63,8 @@ function commandLine(args: string[]) {
 
 function buildCommand(runtime: "bubblewrap" | "firejail", args: string[], cwd: string) {
   const command = commandLine(args);
-  const limited = `if [ -x /usr/bin/time ]; then /usr/bin/time -v sh -c ${quote(command)}; else sh -c ${quote(command)}; fi`;
+  const limitScript = `ulimit -v ${MEMORY_MB * 1024} 2>/dev/null || true; ulimit -u ${PIDS} 2>/dev/null || true; ulimit -t ${Math.max(1, Math.ceil(LIMIT_MS / 1000))} 2>/dev/null || true; exec ${command}`;
+  const limited = `if [ -x /usr/bin/time ]; then /usr/bin/time -v sh -c ${quote(limitScript)}; else sh -c ${quote(limitScript)}; fi`;
 
   if (runtime === "bubblewrap") {
     const binds: string[] = [
@@ -109,6 +111,13 @@ function cap(value: string) {
   return value.length > OUTPUT_LIMIT ? `${value.slice(0, OUTPUT_LIMIT)}\n[output truncated]` : value;
 }
 
+function terminate(child: ReturnType<typeof spawn>, signal: NodeJS.Signals) {
+  try {
+    if (child.pid && process.platform !== "win32") process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch {}
+}
+
 async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: string, timeoutMs: number): Promise<ExecutionResult> {
   const started = process.hrtime.bigint();
   const wrapped = buildCommand(runtime, args, cwd);
@@ -119,6 +128,7 @@ async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
       env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: "/tmp", LANG: "C.UTF-8", LC_ALL: "C.UTF-8" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
     });
 
     let stdout = "";
@@ -131,7 +141,7 @@ async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
       else stderr += chunk.toString();
       if ((stdout.length > OUTPUT_LIMIT || stderr.length > OUTPUT_LIMIT) && !outputKilled) {
         outputKilled = true;
-        child.kill("SIGKILL");
+        terminate(child, "SIGKILL");
       }
     };
 
@@ -140,7 +150,7 @@ async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
 
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      terminate(child, "SIGKILL");
     }, timeoutMs);
 
     child.on("error", (error) => {
@@ -153,7 +163,7 @@ async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
       clearTimeout(timer);
       const wallTimeMs = Number(process.hrtime.bigint() - started) / 1e6;
       resolve({
-        status: timedOut ? "timeout" : code === 0 ? "completed" : "runtime_error",
+        status: timedOut ? "timeout" : outputKilled ? "output_limit" : code === 0 ? "completed" : "runtime_error",
         stdout: cap(stdout),
         stderr: cap(outputKilled ? `${stderr}\n[output limit exceeded]` : stderr),
         exitCode: code,
