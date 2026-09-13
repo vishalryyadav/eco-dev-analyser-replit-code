@@ -1,6 +1,6 @@
-import { analyzeCode, type SupportedLanguage } from "./analyzer";
-import { executeCode, type ExecutionResult } from "./sandbox";
-import { ecoEstimate } from "./eco";
+import { analyzeCode, type SupportedLanguage } from "./analyzer.ts";
+import { executeCode, type ExecutionResult } from "./sandbox.ts";
+import { ecoEstimate } from "./eco.ts";
 
 export type BenchmarkCase = {
   id: string;
