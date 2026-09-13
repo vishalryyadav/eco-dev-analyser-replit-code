@@ -7,6 +7,35 @@ servers:
   - url: /api
     description: Base API path
 paths:
+
+  /api/benchmarks:
+    get:
+      summary: List built-in EcoDev benchmark cases
+      responses:
+        '200':
+          description: Benchmark suite metadata
+  /api/benchmarks/{id}/run:
+    post:
+      summary: Run a built-in benchmark case in the secure sandbox
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, example: ECO-01 }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                warmups: { type: integer, minimum: 0, maximum: 2, default: 2 }
+                iterations: { type: integer, minimum: 1, maximum: 5, default: 5 }
+      responses:
+        '200':
+          description: Benchmark measurements or explicit sandbox-unavailable status
+        '404':
+          description: Unknown benchmark case
   /healthz:
     get:
       operationId: healthCheck
