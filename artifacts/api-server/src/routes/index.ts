@@ -4,6 +4,7 @@ import analyzeRouter from "./analyze";
 import coachRouter from "./coach";
 import reportRouter from "./report";
 import projectRouter from "./project";
+import benchmarkRouter from "./benchmarks";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(analyzeRouter);
 router.use(coachRouter);
 router.use(reportRouter);
 router.use(projectRouter);
+router.use(benchmarkRouter);
 
 export default router;
