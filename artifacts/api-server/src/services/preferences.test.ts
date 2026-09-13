@@ -23,7 +23,7 @@ test("custom weights are clamped and can change ranking", () => {
   assert.equal(weights.memory, 0);
   assert.equal(weights.carbon, 80);
   const alternatives = [
-    { id: "readable", title: "Readable implementation", description: "Simple and maintainable", expectedRuntimeChange: "Same runtime", expectedMemoryChange: "Same memory", simplicity: "High", readability: "High", maintainability: "High", portability: "High", projectedEnergyChange: "Same energy", projectedCarbonChange: "Same carbon" },
+    { id: "readable", title: "Readable implementation", description: "Simple and maintainable", expectedRuntimeChange: "Unknown", expectedMemoryChange: "Same memory", simplicity: "High", readability: "High", maintainability: "High", portability: "High", projectedEnergyChange: "Same energy", projectedCarbonChange: "Same carbon" },
     { id: "fast", title: "Faster implementation", description: "Lower runtime for large inputs", expectedRuntimeChange: "Faster", expectedMemoryChange: "Same memory", simplicity: "Medium", readability: "Medium", maintainability: "Medium", portability: "High", projectedEnergyChange: "Potentially lower energy", projectedCarbonChange: "Potentially lower carbon" },
   ];
   assert.equal(rankAlternatives(alternatives, "balanced", { runtime: 100 })[0].id, "fast");
