@@ -1,8 +1,11 @@
 export type SupportedLanguage = "javascript" | "typescript" | "python" | "c" | "cpp" | "go";
 
-export type Finding = { severity: "high" | "medium" | "low" | "info"; title: string; detail: string; line?: number };
-export type Alternative = { id: string; title: string; description: string; complexity: string; expectedRuntimeChange: string; expectedMemoryChange: string; simplicity: string; readability: string; maintainability: string; portability: string; projectedEnergyChange: string; projectedCarbonChange: string; code?: string };
-export type StaticAnalysis = { language: SupportedLanguage; confidence: "high" | "medium" | "low"; lines: number; bytes: number; complexity: { time: string; space: string; basis: string }; score: number; findings: Finding[]; alternatives: Alternative[] };
+export type FindingConfidence = "high" | "medium" | "low";
+export type Finding = { severity: "high" | "medium" | "low" | "info"; title: string; detail: string; ruleId?: string; line?: number; column?: number; location?: { line: number; column: number }; evidence?: string; effect?: string; recommendation?: string; confidence?: FindingConfidence; benchmarkRequired?: boolean };
+export type AlternativeTradeoffs = { performance: "better" | "same" | "worse" | "unknown"; memory: "better" | "same" | "worse" | "unknown"; energy: "better" | "same" | "worse" | "unknown" | "potentially-better"; carbon: "better" | "same" | "worse" | "unknown" | "potentially-lower"; security: "high" | "medium" | "low" | "review-required"; reliability: "high" | "medium" | "low"; scalability: "high" | "medium" | "low"; portability: "high" | "medium" | "low"; effort: "low" | "medium" | "high"; functionalRisk: "low" | "medium" | "high" };
+export type Alternative = { id: string; title: string; description: string; complexity: string; expectedRuntimeChange: string; expectedMemoryChange: string; simplicity: string; readability: string; maintainability: string; portability: string; projectedEnergyChange: string; projectedCarbonChange: string; code?: string; tradeoffs?: AlternativeTradeoffs };
+export type StaticStructure = { functions: number; calls: number; loops: number; nestedLoops: number; recursion: number; conditionals: number; allocations: number; ioOperations: number; repeatedWorkSignals: number };
+export type StaticAnalysis = { language: SupportedLanguage; confidence: "high" | "medium" | "low"; lines: number; bytes: number; complexity: { time: string; space: string; basis: string; timeClass?: string; spaceClass?: string }; structure: StaticStructure; score: number; findings: Finding[]; alternatives: Alternative[] };
 
 const aliases: Record<string, SupportedLanguage> = { js: "javascript", javascript: "javascript", node: "javascript", ts: "typescript", typescript: "typescript", py: "python", python: "python", c: "c", cc: "cpp", cpp: "cpp", "c++": "cpp", go: "go", golang: "go" };
 export function normalizeLanguage(value?: string | null): SupportedLanguage | null { return value ? aliases[value.trim().toLowerCase()] ?? null : null; }
@@ -20,7 +23,36 @@ export function detectLanguage(code: string, hint?: string | null): { language: 
 
 function count(code: string, re: RegExp) { return [...code.matchAll(re)].length; }
 function hasNestedLoops(code: string) { return /\b(for|while|do)\b[\s\S]{0,1200}\b(for|while|do)\b/.test(code); }
-function lineAt(code: string, index: number) { return code.slice(0, index).split("\n").length; }
+function lineAt(code: string, index: number) { return code.slice(0, Math.max(0, index)).split("\n").length; }
+
+function structuralMetrics(code: string): StaticStructure {
+  const functions = count(code, /\b(function|def|func)\s+[A-Za-z_]\w*|[A-Za-z_]\w*\s*=>/g);
+  const calls = count(code, /\b[A-Za-z_]\w*\s*\(/g);
+  const loops = count(code, /\b(for|while|do)\b/g);
+  const conditionals = count(code, /\b(if|else\s+if|switch|case|when)\b/g);
+  const ioOperations = count(code, /\b(console\.|print\s*\(|printf\s*\(|fmt\.Print|readFile|writeFile|fetch\s*\(|requests\.|http\.)/g);
+  const repeatedWorkSignals = count(code, /\.(includes|indexOf|find|some|sort)\s*\(|\b(JSON\.(parse|stringify)|parseInt|parseFloat)\s*\(/g);
+  return { functions, calls, loops, nestedLoops: hasNestedLoops(code) ? 1 : 0, recursion: /\b([A-Za-z_]\w*)\s*\([^\n]*\)[\s\S]{0,450}\b\1\s*\(/.test(code) ? 1 : 0, conditionals, allocations: count(code, /\bnew\s+|Array\(|Object\.|Map\(|Set\(|dict\(|list\(|malloc\s*\(/g), ioOperations, repeatedWorkSignals };
+}
+
+function completeFindings(findings: Finding[]): Finding[] {
+  return findings.map((finding, index) => {
+    const stable = (finding.title || "finding").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const severity = finding.severity;
+    return {
+      ...finding,
+      ruleId: finding.ruleId ?? `ECO-${stable || "RULE"}-${index + 1}`,
+      line: finding.line ?? 1,
+      column: finding.column ?? 1,
+      location: finding.location ?? { line: finding.line ?? 1, column: finding.column ?? 1 },
+      evidence: finding.evidence ?? finding.detail,
+      effect: finding.effect ?? (severity === "info" ? "No material hotspot was established by this rule." : "This pattern may increase work, resource use, or engineering risk as the workload grows."),
+      recommendation: finding.recommendation ?? finding.detail,
+      confidence: finding.confidence ?? (severity === "high" ? "medium" : severity === "info" ? "low" : "medium"),
+      benchmarkRequired: finding.benchmarkRequired ?? severity !== "info",
+    };
+  });
+}
 
 function uniqueItemsAlternative(code: string) {
   const match = code.match(/function\s+uniqueItems\s*\(items\)[\s\S]*?\n\}/m);
@@ -78,5 +110,16 @@ export function analyzeCode(code: string, languageHint?: string | null): StaticA
     alternatives.push({ id: "hot-path", title: "Tune the measured hot path", description: "Keep the algorithm, but remove unnecessary allocation, conversion, and repeated work around the measured hotspot.", complexity: time, expectedRuntimeChange: "Workload-dependent", expectedMemoryChange: "Neutral to slightly lower", simplicity: "High", readability: "High", maintainability: "Very high", portability: "Very high", projectedEnergyChange: "Usually a modest improvement unless the hotspot is allocation-heavy.", projectedCarbonChange: "Projected modest reduction; verify with a before/after run." });
     alternatives.push({ id: "batch-work", title: "Batch repeated work", description: "Move invariant work out of loops and combine repeated I/O or serialization operations.", complexity: time, expectedRuntimeChange: "Potentially lower constant factors", expectedMemoryChange: "Low to moderate", simplicity: "High", readability: "High", maintainability: "High", portability: "Very high", projectedEnergyChange: "Potentially lower CPU energy through less repeated work.", projectedCarbonChange: "Projected lower emissions when runtime falls.", code: suggestionCode(language, "batch-work") });
   }
-  return { language, confidence: detected.confidence, lines, bytes, complexity: { time, space, basis }, score, findings, alternatives };
+  const structure = structuralMetrics(code);
+  const completeAlternatives = alternatives.map((alternative): Alternative => ({
+    ...alternative,
+    tradeoffs: alternative.tradeoffs ?? {
+      performance: /faster|lower constant|reduce work|o\(n\)|top-k/i.test(`${alternative.expectedRuntimeChange} ${alternative.description}`) ? "better" : "unknown",
+      memory: /lower|reduce|o\(k\)|o\(1\)/i.test(alternative.expectedMemoryChange) ? "better" : /\+o\(n\)|additional/i.test(alternative.expectedMemoryChange) ? "worse" : "unknown",
+      energy: /potential|projected|lower/i.test(alternative.projectedEnergyChange) ? "potentially-better" : "unknown",
+      carbon: /potential|projected|lower/i.test(alternative.projectedCarbonChange) ? "potentially-lower" : "unknown",
+      security: "review-required", reliability: "medium", scalability: /large|scale|o\(n\)|stream|batch/i.test(`${alternative.title} ${alternative.description}`) ? "high" : "medium", portability: /very high|high/i.test(alternative.portability) ? "high" : "medium", effort: /simple|low/i.test(alternative.simplicity) ? "low" : "medium", functionalRisk: "medium",
+    },
+  }));
+  return { language, confidence: detected.confidence, lines, bytes, complexity: { time, space, basis, timeClass: time.replace(/ inferred$/, ""), spaceClass: space.replace(/ inferred$/, "") }, structure, score, findings: completeFindings(findings), alternatives: completeAlternatives };
 }
