@@ -1,17 +1,31 @@
 import { Router } from "express";
 import { analyzeCode, normalizeLanguage } from "../services/analyzer";
 import { executeCode, type ExecutionResult, executionLimits } from "../services/sandbox";
-import { normalizeProfile, rankAlternatives, type OptimizationProfile } from "../services/preferences";
+import { normalizeProfile, normalizePriorityWeights, rankAlternatives, type OptimizationProfile } from "../services/preferences";
 import { securityAnalyze } from "../services/security";
-import { ecoEstimate } from "../services/eco";
+import { ecoEstimate, type EcoOptions } from "../services/eco";
 
 const router = Router();
 const MAX_CODE_BYTES = 200_000;
 
-type RunPayload = { code?: unknown; language?: unknown; compareCode?: unknown; compareLanguage?: unknown; execute?: unknown; preferences?: unknown; benchmarkIterations?: unknown };
+type RunPayload = { code?: unknown; language?: unknown; compareCode?: unknown; compareLanguage?: unknown; execute?: unknown; preferences?: unknown; eco?: unknown; benchmarkIterations?: unknown };
 
 function summarize(execution: ExecutionResult | null) { if (!execution) return null; return { status: execution.status, stdout: execution.stdout, stderr: execution.stderr, exitCode: execution.exitCode, signal: execution.signal, wallTimeMs: execution.wallTimeMs == null ? null : Number(execution.wallTimeMs.toFixed(3)), cpuTimeMs: execution.cpuTimeMs == null ? null : Number(execution.cpuTimeMs.toFixed(3)), peakMemoryKb: execution.peakMemoryKb, measured: execution.measured, sandbox: execution.sandbox }; }
 function profileFromPayload(value: unknown): OptimizationProfile { if (!value || typeof value !== "object") return "balanced"; return normalizeProfile((value as { profile?: unknown }).profile); }
+function prioritiesFromPayload(value: unknown, profile: OptimizationProfile) { if (!value || typeof value !== "object") return normalizePriorityWeights(null, profile); return normalizePriorityWeights((value as { weights?: unknown }).weights, profile); }
+function ecoOptionsFromPayload(value: unknown): EcoOptions {
+  if (!value || typeof value !== "object") return {};
+  const input = value as Record<string, unknown>;
+  return { region: typeof input.region === "string" ? input.region.slice(0, 80) : undefined, gridFactorGPerKwh: Number.isFinite(Number(input.gridFactorGPerKwh)) ? Number(input.gridFactorGPerKwh) : undefined, gridSource: typeof input.gridSource === "string" ? input.gridSource.slice(0, 240) : undefined, gridYear: typeof input.gridYear === "string" || typeof input.gridYear === "number" ? input.gridYear : undefined, functionalUnit: typeof input.functionalUnit === "string" ? input.functionalUnit.slice(0, 80) : undefined, functionalUnitCount: Number.isFinite(Number(input.functionalUnitCount)) ? Number(input.functionalUnitCount) : undefined, embodiedEmissionsGrams: Number.isFinite(Number(input.embodiedEmissionsGrams)) ? Number(input.embodiedEmissionsGrams) : undefined };
+}
+function normalizedOutput(value: string | null | undefined) { return String(value ?? "").replace(/\r\n/g, "\n").trim(); }
+function correctness(baseline: ExecutionResult | null, candidate: ExecutionResult | null) {
+  if (!baseline || !candidate) return { status: "unavailable", reason: "Both baseline and alternative must complete before correctness can be checked." };
+  if (baseline.status !== "completed" || candidate.status !== "completed") return { status: "blocked", reason: "Optimization is blocked because baseline or alternative execution did not complete successfully." };
+  const sameExit = baseline.exitCode === candidate.exitCode;
+  const sameOutput = normalizedOutput(baseline.stdout) === normalizedOutput(candidate.stdout);
+  return sameExit && sameOutput ? { status: "verified", reason: "Baseline and alternative produced the same normalized stdout and exit status." } : { status: "blocked", reason: "Baseline and alternative produced different stdout or exit status; review behavior before adopting the alternative." };
+}
 
 router.post("/analyze", async (req, res) => {
   try {
@@ -24,11 +38,13 @@ router.post("/analyze", async (req, res) => {
     const iterationsRaw = body.benchmarkIterations == null ? 1 : Number(body.benchmarkIterations);
     if (!Number.isInteger(iterationsRaw) || iterationsRaw < 1 || iterationsRaw > 5) return res.status(400).json({ error: "benchmarkIterations must be an integer from 1 to 5" });
     const profile = profileFromPayload(body.preferences);
+    const priorityWeights = prioritiesFromPayload(body.preferences, profile);
+    const ecoOptions = ecoOptionsFromPayload(body.eco);
     const requestedLanguage = body.language == null ? null : normalizeLanguage(String(body.language));
     if (body.language != null && !requestedLanguage) return res.status(400).json({ error: "Unsupported language. Use JavaScript, TypeScript, Python, C, C++, or Go." });
     const analysis = analyzeCode(body.code, requestedLanguage);
     const security = securityAnalyze(body.code, analysis.language);
-    analysis.alternatives = rankAlternatives(analysis.alternatives, profile);
+    analysis.alternatives = rankAlternatives(analysis.alternatives, profile, priorityWeights);
     if (!requestedLanguage && analysis.confidence === "low") return res.status(422).json({ error: "Language could not be inferred confidently. Select a language explicitly." });
 
     let compile: ExecutionResult | null = null, execution: ExecutionResult | null = null;
@@ -55,7 +71,7 @@ router.post("/analyze", async (req, res) => {
     if (compare) {
       const compareLanguage = body.compareLanguage == null ? analysis.language : normalizeLanguage(String(body.compareLanguage));
       if (!compareLanguage) return res.status(400).json({ error: "Unsupported compareLanguage. Use JavaScript, TypeScript, Python, C, C++, or Go." });
-      const compareAnalysis = analyzeCode(compare, compareLanguage); compareAnalysis.alternatives = rankAlternatives(compareAnalysis.alternatives, profile);
+      const compareAnalysis = analyzeCode(compare, compareLanguage); compareAnalysis.alternatives = rankAlternatives(compareAnalysis.alternatives, profile, priorityWeights);
       const compareRuns = [] as ExecutionResult[];
       let compareRun = !runEnabled ? { compile: null, execution: null } : await executeCode(compare, compareAnalysis.language);
       if (runEnabled && compareRun.execution?.status === "completed") {
@@ -65,13 +81,14 @@ router.post("/analyze", async (req, res) => {
         if (validCompare.length > 1) { const wallTimes = validCompare.map((run) => run.wallTimeMs as number).sort((a, b) => a - b); compareRun = { ...compareRun, execution: { ...compareRun.execution, wallTimeMs: wallTimes[Math.floor(wallTimes.length / 2)] } }; }
       }
       const beforeRuntime = execution?.wallTimeMs ?? null, afterRuntime = compareRun.execution?.wallTimeMs ?? null, beforeMemory = execution?.peakMemoryKb ?? null, afterMemory = compareRun.execution?.peakMemoryKb ?? null;
-      const beforeEco = ecoEstimate(execution), afterEco = ecoEstimate(compareRun.execution);
-      comparison = { analysis: compareAnalysis, compile: summarize(compareRun.compile), execution: summarize(compareRun.execution), eco: afterEco, delta: { runtimeMs: beforeRuntime != null && afterRuntime != null ? Number((afterRuntime - beforeRuntime).toFixed(3)) : null, runtimePercent: beforeRuntime != null && afterRuntime != null && beforeRuntime !== 0 ? Number((((afterRuntime - beforeRuntime) / beforeRuntime) * 100).toFixed(2)) : null, peakMemoryKb: beforeMemory != null && afterMemory != null ? afterMemory - beforeMemory : null, carbonGrams: beforeEco.carbonGrams != null && afterEco.carbonGrams != null ? Number((afterEco.carbonGrams - beforeEco.carbonGrams).toFixed(6)) : null } };
+      const beforeEco = ecoEstimate(execution, ecoOptions), afterEco = ecoEstimate(compareRun.execution, ecoOptions);
+      const correctnessReport = correctness(execution, compareRun.execution);
+      comparison = { analysis: compareAnalysis, compile: summarize(compareRun.compile), execution: summarize(compareRun.execution), eco: afterEco, correctness: correctnessReport, optimization: correctnessReport.status === "verified" ? "available" : "BLOCKED", delta: { runtimeMs: beforeRuntime != null && afterRuntime != null ? Number((afterRuntime - beforeRuntime).toFixed(3)) : null, runtimePercent: beforeRuntime != null && afterRuntime != null && beforeRuntime !== 0 ? Number((((afterRuntime - beforeRuntime) / beforeRuntime) * 100).toFixed(2)) : null, peakMemoryKb: beforeMemory != null && afterMemory != null ? afterMemory - beforeMemory : null, carbonGrams: beforeEco.carbonGrams != null && afterEco.carbonGrams != null ? Number((afterEco.carbonGrams - beforeEco.carbonGrams).toFixed(6)) : null } };
     }
 
-    const eco = ecoEstimate(execution);
+    const eco = ecoEstimate(execution, ecoOptions);
     if (compile?.status === "compile_error") eco.basis = "Program execution was skipped because compilation failed. Fix the compiler errors and analyze again to measure program runtime, electricity, and carbon scenarios.";
-    return res.json({ ok: true, submission: { language: analysis.language, detectionConfidence: analysis.confidence, bytes: analysis.bytes, lines: analysis.lines }, analysis, security, compile: summarize(compile), execution: summarize(execution), eco, comparison, preferences: { profile, instruction: typeof body.preferences === "object" && body.preferences ? (body.preferences as { instruction?: unknown }).instruction ?? null : null, rankedBy: profile }, limits: executionLimits, benchmark: { iterationsRequested: iterationsRaw, samplesCollected: benchmarkSamples.length || (execution?.wallTimeMs != null ? 1 : 0), strategy: iterationsRaw > 1 ? "median wall/CPU; max observed RSS" : "single run" }, model: { version: "eco-scenario-v2", note: "Energy and carbon are scenario estimates unless a hardware energy meter is explicitly integrated.", sources: eco.sources } });
+    return res.json({ ok: true, submission: { language: analysis.language, detectionConfidence: analysis.confidence, bytes: analysis.bytes, lines: analysis.lines }, analysis, security, compile: summarize(compile), execution: summarize(execution), eco, comparison, preferences: { profile, weights: priorityWeights, instruction: typeof body.preferences === "object" && body.preferences ? (body.preferences as { instruction?: unknown }).instruction ?? null : null, rankedBy: profile }, limits: executionLimits, benchmark: { iterationsRequested: iterationsRaw, samplesCollected: benchmarkSamples.length || (execution?.wallTimeMs != null ? 1 : 0), strategy: iterationsRaw > 1 ? "median wall/CPU; max observed RSS" : "single run" }, model: { version: "eco-scenario-v2", note: "Energy and carbon are scenario estimates unless a hardware energy meter is explicitly integrated.", sources: eco.sources } });
   } catch (error) { req.log?.error?.({ err: error }, "Code analysis failed"); return res.status(500).json({ error: "Analysis failed unexpectedly. Check server logs for details." }); }
 });
 
