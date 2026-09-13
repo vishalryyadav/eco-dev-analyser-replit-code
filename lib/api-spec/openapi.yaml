@@ -52,6 +52,24 @@ components:
         compareCode: { type: string, maxLength: 200000 }
         compareLanguage: { type: string, enum: [javascript, typescript, python, c, cpp, go] }
         execute: { type: boolean, default: true }
+        benchmarkIterations: { type: integer, minimum: 1, maximum: 5, default: 1 }
+        preferences:
+          type: object
+          properties:
+            profile: { type: string, enum: [balanced, fast, memory, green, reliable, secure, scalable] }
+            instruction: { type: string, maxLength: 2000 }
+            weights: { type: object, additionalProperties: { type: number, minimum: 0, maximum: 100 } }
+        eco:
+          type: object
+          description: Regional grid and SCI-style reporting options. Energy remains modeled unless a hardware meter is attached.
+          properties:
+            region: { type: string }
+            gridFactorGPerKwh: { type: number, minimum: 0 }
+            gridSource: { type: string }
+            gridYear: { oneOf: [{ type: string }, { type: number }] }
+            functionalUnit: { type: string, enum: [execution, request, transaction, job, batch, custom] }
+            functionalUnitCount: { type: number, exclusiveMinimum: 0 }
+            embodiedEmissionsGrams: { type: number, minimum: 0 }
     AnalyzeResponse:
       type: object
       required: [ok, submission, analysis, eco]
