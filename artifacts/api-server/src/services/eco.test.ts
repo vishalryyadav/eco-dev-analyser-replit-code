@@ -25,3 +25,14 @@ test("uses measured CPU time and returns a scenario range", () => {
   assert.equal(result.projection.scenario.reductionLowPercent, 10);
   assert.equal(result.projection.scenario.reductionHighPercent, 40);
 });
+test("reports India grid provenance and an SCI-style operational estimate", () => {
+  const result = ecoEstimate({ cpuTimeMs: 1000, wallTimeMs: 2, measured: true }, { region: "India", functionalUnit: "request", functionalUnitCount: 10 });
+  assert.equal(result.grid.region, "India");
+  assert.equal(result.grid.factorGPerKwh, 710);
+  assert.equal(result.grid.year, "FY2024–25");
+  assert.equal(result.energyLevel, "MODELED");
+  assert.equal(result.sci.label, "SCI-style operational estimate");
+  assert.equal(result.sci.functionalUnit, "request");
+  assert.equal(result.sci.functionalUnitCount, 10);
+  assert.ok(result.sci.scoreGramsPerUnit != null);
+});
