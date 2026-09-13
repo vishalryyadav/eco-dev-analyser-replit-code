@@ -48,3 +48,16 @@ test("flags a source file that ends with an unfinished control statement", () =>
   const result = analyzeCode("int main(void) {\n  if (data == NULL)", "c");
   assert.ok(result.findings.some((item) => item.title === "Source appears incomplete"));
 });
+
+test("findings include auditable evidence and structural metrics", () => {
+  const result = analyzeCode("function f(items) { for (const item of items) { if (items.includes(item)) console.log(item); } }", "javascript");
+  assert.equal(result.structure.loops, 1);
+  assert.ok(result.structure.calls >= 2);
+  const finding = result.findings.find((item) => item.severity !== "info");
+  assert.ok(finding);
+  assert.match(String(finding?.ruleId), /^ECO-/);
+  assert.equal(finding?.location?.line, finding?.line);
+  assert.ok(finding?.evidence);
+  assert.ok(finding?.recommendation);
+  assert.ok(finding?.benchmarkRequired);
+});
