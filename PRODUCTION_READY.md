@@ -26,7 +26,7 @@ The desktop companion binds only to `127.0.0.1` and provides best-effort CPU/loa
 
 ### Green-computing reporting
 
-EcoDev's recommendations are framed around three reduction levers emphasized by the Green Software Foundation: energy efficiency, carbon awareness, and hardware efficiency. The SCI methodology is the longer-term target for reporting carbon intensity per functional unit rather than presenting raw carbon totals alone.
+EcoDev's recommendations are framed around three reduction levers emphasized by the Green Software Foundation: energy efficiency, carbon awareness, and hardware efficiency. The API emits an SCI-style operational estimate using (E × I + M) / R, with functional units, grid-factor provenance, confidence, and an explicit no-certification disclaimer. Raw energy/carbon scenarios remain visible alongside the functional-unit result.
 
 References:
 
@@ -57,3 +57,12 @@ docker compose -f docker-compose.production.yml up --build
 ```
 
 The release endpoint is `http://localhost:5000`; stop it with `docker compose -f docker-compose.production.yml down`.
+
+
+## Current measurement and decision safeguards
+
+- Static findings include stable rule IDs, source locations, evidence, potential effect, recommendation, confidence, and a benchmark-required flag.
+- Developer priorities can use bounded custom weights from 0–100; recommendations are described as the best match for those priorities, not an objective best.
+- Before/after comparisons expose a correctness gate and report `BLOCKED` when exit status or normalized output differs.
+- India grid output defaults to the explicitly labeled CEA FY2024–25 reference factor and can be updated through request options or environment configuration.
+- Energy and carbon remain `MODELED` unless a hardware energy meter is integrated; host telemetry is not treated as exact application energy.
