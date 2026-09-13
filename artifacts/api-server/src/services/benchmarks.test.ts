@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getBenchmark, listBenchmarks } from "./benchmarks";
+import { getBenchmark, listBenchmarks } from "./benchmarks.ts";
 
 test("built-in benchmark suite contains ECO-01 through ECO-06", () => {
   const suite = listBenchmarks();
