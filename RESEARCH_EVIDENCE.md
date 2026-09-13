@@ -32,3 +32,13 @@ EcoDev uses runtime measurements where the execution environment permits them an
 - Static complexity detection is heuristic and cannot prove arbitrary-program complexity.
 - Optimization alternatives are decision support. Users should benchmark candidate code with representative inputs before adopting a change.
 - Language-level research results are not treated as a universal ranking for every application.
+
+
+## Standards and regional carbon provenance
+
+- **ISO/IEC 21031:2024**, Software Carbon Intensity: EcoDev follows the conceptual SCI expression (E × I + M) / R for an SCI-style operational estimate. The product does not claim certification or full conformity.
+- **Green Software Foundation SCI**, https://greensoftware.foundation/standards/sci/: used as the operational-carbon methodology reference.
+- **Central Electricity Authority of India**, https://cea.nic.in/: India is supported as a configurable region. The default 710 gCO2e/kWh value is labeled explicitly as the CEA FY2024–25 reference and is not treated as a universal constant.
+- **Pereira et al.**, Energy efficiency across programming languages: how do energy, time, and memory relate?, DOI: https://doi.org/10.1145/3136014.3136031: published benchmark evidence only; it is not substituted for a user workload measurement.
+
+Every carbon result includes region, factor, unit, source, year, retrieval date, and a confidence/provenance label. Modeled energy and carbon are never presented as direct hardware measurements.
