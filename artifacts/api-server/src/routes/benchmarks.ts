@@ -14,7 +14,7 @@ router.post("/benchmarks/:id/run", async (req, res) => {
   if (warmups != null && (!Number.isInteger(warmups) || warmups < 0 || warmups > 2)) return res.status(400).json({ ok: false, error: "warmups must be an integer from 0 to 2" });
   if (iterations != null && (!Number.isInteger(iterations) || iterations < 1 || iterations > 5)) return res.status(400).json({ ok: false, error: "iterations must be an integer from 1 to 5" });
   const result = await runBenchmark(req.params.id, { warmups, iterations });
-  res.json({ ok: true, ...result });
+  return res.json({ ok: true, ...result });
 });
 
 export default router;
