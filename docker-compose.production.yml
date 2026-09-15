@@ -6,7 +6,10 @@ services:
     image: ecodev-production:local
     ports:
       - "5000:5000"
-    mem_limit: 1g
+    # The API and each nested, capped runner share this cgroup.  Two GiB keeps
+    # V8's address-space reservation from killing the API; Node runners also
+    # receive a fixed 192 MiB old-space ceiling in sandbox.ts.
+    mem_limit: 2g
     pids_limit: 128
     restart: unless-stopped
     read_only: true

@@ -9,6 +9,11 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends bubblewrap gcc g++ golang-go python3 ca-certificates time \
   && rm -rf /var/lib/apt/lists/*
 
+# The isolated TypeScript compiler only receives the approved system paths, not
+# the application's dependency tree. Install this pinned compiler in /usr/local
+# so Bubblewrap can expose it read-only alongside the supported runtimes.
+RUN npm install --global typescript@5.9.3
+
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json tsconfig.base.json ./
 COPY lib ./lib

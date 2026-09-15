@@ -21,12 +21,12 @@ export type SandboxRun = { compile: ExecutionResult | null; execution: Execution
 type Definition = { source: string; compile: string[] | null; run: string[] };
 
 const definitions: Record<SupportedLanguage, Definition> = {
-  javascript: { source: "main.js", compile: null, run: ["node", "main.js"] },
-  typescript: { source: "main.ts", compile: ["tsc", "main.ts", "--target", "ES2022", "--module", "commonjs", "--outDir", "build", "--pretty", "false"], run: ["node", "build/main.js"] },
+  javascript: { source: "main.js", compile: null, run: ["node", "--max-old-space-size=192", "main.js"] },
+  typescript: { source: "main.ts", compile: ["node", "--max-old-space-size=384", "/usr/local/bin/tsc", "main.ts", "--target", "ES2022", "--module", "commonjs", "--outDir", "build", "--pretty", "false"], run: ["node", "--max-old-space-size=192", "build/main.js"] },
   python: { source: "main.py", compile: null, run: ["python3", "-I", "main.py"] },
   c: { source: "main.c", compile: ["gcc", "-O2", "-std=c11", "-D_POSIX_C_SOURCE=200809L", "main.c", "-o", "main", "-lm"], run: ["./main"] },
   cpp: { source: "main.cpp", compile: ["g++", "-O2", "-std=c++17", "main.cpp", "-o", "main"], run: ["./main"] },
-  go: { source: "main.go", compile: ["go", "build", "-o", "main", "main.go"], run: ["./main"] },
+  go: { source: "main.go", compile: ["go", "build", "-p", "1", "-o", "main", "main.go"], run: ["./main"] },
 };
 
 function positiveNumber(name: string, fallback: number) {
@@ -36,7 +36,7 @@ function positiveNumber(name: string, fallback: number) {
 
 const LIMIT_MS = Math.max(250, Math.min(30_000, positiveNumber("ECODEV_EXEC_TIMEOUT_MS", 5_000)));
 const MEMORY_MB = Math.max(32, Math.min(1_024, positiveNumber("ECODEV_EXEC_MEMORY_MB", 256)));
-const PIDS = Math.max(8, Math.min(128, positiveNumber("ECODEV_EXEC_PIDS", 32)));
+const PIDS = Math.max(8, Math.min(128, positiveNumber("ECODEV_EXEC_PIDS", 128)));
 const WORK_ROOT = process.env.ECODEV_WORK_ROOT || tmpdir();
 const OUTPUT_LIMIT = 32_000;
 
@@ -63,7 +63,12 @@ function commandLine(args: string[]) {
 
 function buildCommand(runtime: "bubblewrap" | "firejail", args: string[], cwd: string) {
   const command = commandLine(args);
-  const limitScript = `ulimit -v ${MEMORY_MB * 1024} 2>/dev/null || true; ulimit -u ${PIDS} 2>/dev/null || true; ulimit -t ${Math.max(1, Math.ceil(LIMIT_MS / 1000))} 2>/dev/null || true; exec ${command}`;
+  // V8 reserves a large virtual address space on startup.  Applying RLIMIT_AS
+  // to Node/tsc makes a harmless program fail before it executes; the outer
+  // container cgroup still enforces the configured physical-memory ceiling.
+  const usesV8 = args[0] === "node" || args[0] === "tsc";
+  const memoryLimit = usesV8 ? "" : `ulimit -v ${MEMORY_MB * 1024} 2>/dev/null || true; `;
+  const limitScript = `${memoryLimit}ulimit -u ${PIDS} 2>/dev/null || true; ulimit -t ${Math.max(1, Math.ceil(LIMIT_MS / 1000))} 2>/dev/null || true; exec ${command}`;
   const limited = `if [ -x /usr/bin/time ]; then /usr/bin/time -v sh -c ${quote(limitScript)}; else sh -c ${quote(limitScript)}; fi`;
 
   if (runtime === "bubblewrap") {
@@ -84,6 +89,7 @@ function buildCommand(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
       "--setenv", "HOME", "/tmp",
       "--setenv", "LANG", "C.UTF-8",
       "--setenv", "LC_ALL", "C.UTF-8",
+      "--setenv", "GOMAXPROCS", "1",
     ];
     binds.push("--ro-bind-try", "/usr/local", "/usr/local");
     binds.push("--ro-bind-try", "/lib64", "/lib64");
@@ -125,7 +131,7 @@ async function runOne(runtime: "bubblewrap" | "firejail", args: string[], cwd: s
   return new Promise((resolve) => {
     const child = spawn(wrapped.command, wrapped.args, {
       cwd: "/",
-      env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: "/tmp", LANG: "C.UTF-8", LC_ALL: "C.UTF-8" },
+      env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: "/tmp", LANG: "C.UTF-8", LC_ALL: "C.UTF-8", GOMAXPROCS: "1" },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
       detached: process.platform !== "win32",

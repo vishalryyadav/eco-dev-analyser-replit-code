@@ -21,7 +21,7 @@ Defaults are explicit and configurable:
 - `ECODEV_CARBON_G_PER_KWH_LOW=100` and `ECODEV_CARBON_G_PER_KWH_HIGH=800`
 - `ECODEV_EXEC_TIMEOUT_MS=5000`
 - `ECODEV_EXEC_MEMORY_MB=256`
-- `ECODEV_EXEC_PIDS=32`
+- `ECODEV_EXEC_PIDS=128`
 
 EcoDev never labels modeled energy/carbon as directly measured. The API returns a scenario range, midpoint, input telemetry, methodology, and source links. Configure measured device power and location/time-specific grid data to narrow the range. SCI also requires a functional unit and embodied emissions for a complete SCI score; this per-run report does not claim to be a full SCI score.
 
@@ -31,11 +31,11 @@ EcoDev never labels modeled energy/carbon as directly measured. The API returns 
 
 ## Optimization profiles
 
-`preferences.profile` can be `balanced`, `fast`, `memory`, `green`, `reliable`, `secure`, or `scalable`. The API ranks the same concrete alternatives differently according to the requested engineering goal. An optional `preferences.instruction` is preserved in the response so clients can show the user's decision context. Rankings do not prove semantic equivalence; candidate code should be tested before adoption.
+`preferences.profile` can be `balanced`, `fast`, `memory`, `green`, `reliable`, `secure`, or `scalable`. The API ranks the same concrete alternatives differently according to the requested engineering goal. The Analyzer also exposes optional 0–100 custom weights for performance, memory, energy, carbon, readability, maintainability, security, reliability, scalability, and portability; these weights are sent as `preferences.weights`. An optional `preferences.instruction` is preserved in the response so clients can show the user's decision context. Rankings are described as the best match for the selected priorities, never as an objective best, and do not prove semantic equivalence; candidate code should be tested before adoption.
 
 ## Sandbox
 
-The service prefers Bubblewrap (`bwrap`) and then Firejail. Both paths clear the inherited environment, disable networking, create a private writable workspace, apply memory/process limits, and kill over-timeout processes. Temporary source files are removed after each run.
+The service prefers Bubblewrap (`bwrap`) and then Firejail. Both paths clear the inherited environment, disable networking, create a private writable workspace, apply memory/process limits, and kill over-timeout processes. The production container also pins a global TypeScript compiler so TypeScript is available inside the isolated runner. Temporary source files are removed after each run.
 
 If neither sandbox runtime is installed, the API **fails closed for code execution** and returns static analysis plus a `sandbox_unavailable` execution status. There is no production switch for bypassing the sandbox.
 
