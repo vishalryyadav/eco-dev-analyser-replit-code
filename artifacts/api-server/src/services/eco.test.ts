@@ -9,6 +9,13 @@ test("returns no eco number without measured execution data", () => {
   assert.equal(result.range, null);
   assert.equal(result.assumptions.input, "unavailable");
 });
+test("does not model eco results from unsuccessful execution telemetry", () => {
+  const result = ecoEstimate({ cpuTimeMs: 1000, wallTimeMs: 1000, measured: false });
+  assert.equal(result.energyWh, null);
+  assert.equal(result.carbonGrams, null);
+  assert.equal(result.range, null);
+  assert.equal(result.assumptions.input, "unavailable");
+});
 
 test("uses measured CPU time and returns a scenario range", () => {
   const result = ecoEstimate({ cpuTimeMs: 1000, wallTimeMs: 2, measured: true });
@@ -34,5 +41,7 @@ test("reports India grid provenance and an SCI-style operational estimate", () =
   assert.equal(result.sci.label, "SCI-style operational estimate");
   assert.equal(result.sci.functionalUnit, "request");
   assert.equal(result.sci.functionalUnitCount, 10);
+  assert.equal(result.sci.energyKwh, result.energyWh! / 1000);
+  assert.ok(Math.abs(result.sci.operationalCarbonGrams! - result.sci.energyKwh! * result.grid.factorGPerKwh) < 1e-12);
   assert.ok(result.sci.scoreGramsPerUnit != null);
 });

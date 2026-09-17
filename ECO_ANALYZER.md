@@ -6,10 +6,24 @@ EcoDev turns submitted source code into a measurable engineering report. The ana
 
 JavaScript, TypeScript, Python, C, C++, and Go.
 
+## Privacy and data handling
+
+**Implementation fact:** submitted source is sent to the configured EcoDev API for analysis, project scanning, or the local-rules coach. This implementation does not write submitted source to an application database or server-side analysis-history store. When sandbox execution is requested, the source is written to a private temporary workspace and removed after the run. The in-memory rate limiter retains a client IP address and request count for its configured window (60 seconds by default), but not source or results.
+
+**Browser retention:** the web app stores up to 12 returned analysis-result objects in the browser's `localStorage` key `ecodev-history`. These objects can include findings, scores, returned stdout/stderr, and runtime/measurement metadata; they do not include the original submitted request body as a separate history item. Entries remain until they are displaced by the 12-entry limit, cleared by the user, or removed with browser site data. The History screen's **Clear local history** action removes only this key immediately. Downloaded reports and normal browser cache/storage are controlled separately by the user/browser.
+
+**Results and reports:** analysis results are returned to the caller. Selecting a report download sends the result object to `POST /api/report` solely to create that response; this implementation does not retain a server-side report history.
+
+**Configuration-dependent behavior:** a local/self-hosted deployment sends source to the API the user/operator configured; a public deployment sends source to that public API host. EcoDev cannot establish an external host, reverse proxy, platform, operating-system, or operator log-retention policy. Do not assume submitted code never leaves a device unless the actual deployment establishes that property.
+
+**Laptop Saver:** a normal web browser does not automatically obtain whole-device telemetry. The optional companion binds to `127.0.0.1` and has no upload client; its snapshot is returned only to a local caller that requests it. Analyzer energy/carbon values are modeled execution estimates, not whole-laptop electricity measurements.
+
+The included analyzer, sandbox workflow, local-rules coach, benchmarks, Green Score, and Laptop Saver do not require paid API keys, subscriptions, or external AI services. This is not a statement about a deployment operator's hosting costs.
+
 ## Measurements vs estimates
 
-- **Runtime / wall time**: measured by the server process for a sandbox invocation when secure execution is available.
-- **CPU time**: measured from GNU `time -v` output when the runtime image provides it; otherwise the successful-run value may fall back to wall time and is labelled accordingly.
+- **Runtime / wall time**: measured sandbox-run wall time for a secure invocation; it includes secure-runner and sandbox overhead, not only user-program instructions.
+- **CPU time**: measured from GNU `time -v` output when the runtime image provides it; otherwise it is reported as unavailable. Only the energy model may use measured sandbox-run wall time as its fallback duration.
 - **Peak memory**: measured from maximum resident set size when GNU `time -v` is available.
 - **Time/space complexity**: static structural inference. It is not a measurement and cannot prove arbitrary-program complexity.
 - **Energy**: estimated from measured process CPU time (or measured wall time when CPU telemetry is unavailable) and a documented low/high CPU-package power scenario.
@@ -27,7 +41,15 @@ EcoDev never labels modeled energy/carbon as directly measured. The API returns 
 
 ## Benchmarking
 
-`benchmarkIterations` accepts 1–5 runs. For more than one run, EcoDev reports the median wall/CPU result and the maximum observed RSS among completed runs. This reduces the effect of one noisy sample while keeping execution bounded.
+`benchmarkIterations` accepts 1–5 runs. For more than one run, EcoDev reports the median wall/CPU result and the maximum observed RSS among completed runs. This reduces the effect of one noisy sample while keeping execution bounded. The built-in suite only marks a language `IMPLEMENTED` when it has a real deterministic workload; the other supported languages are explicitly `UNAVAILABLE`, never filled with synthetic numbers. Built-in cases accept only their documented `inputSizes` and generate the workload deterministically from that size.
+
+For a before/after candidate, `representativeInputs` may contain 1–8 bounded stdin strings. EcoDev repeats each input case, compares stdout and exit status, validates JSON structurally when output is JSON, and can check declared deterministic expected output in the harness. `VERIFIED` means deterministic agreement for the supplied cases only; `PARTIAL` and `UNAVAILABLE` never establish semantic equivalence. Savings are suppressed unless both sides have three completed, measured runs, valid telemetry, and `VERIFIED` correctness.
+
+## Static structural analysis
+
+Static analysis is separate from sandbox execution and reports `INFERRED` source-structure evidence plus a `CALCULATED` static score. For JavaScript, TypeScript, Python, C, C++, and Go, EcoDev recognizes common declarations, conditionals, loops, structurally nested loops, directly detectable recursion, selected language-native sorting and membership calls, repeated scans in loops, and allocation-like constructs. It does not compile the submission for theorem-level analysis or prove exact algorithmic complexity.
+
+Complexity labels such as `O(n²)-like inferred` describe an upper-bound-shaped pattern observed in the source, not an exact runtime guarantee: loop bounds can be constant, data-dependent, or short-circuit; library behavior and input distributions can differ. Findings therefore include evidence, an inference/limitation, confidence, recommendation, and whether a benchmark is required. Recommendations are directions to validate, never guaranteed savings. Measured performance claims require completed sandbox benchmarks with representative workloads.
 
 ## Optimization profiles
 

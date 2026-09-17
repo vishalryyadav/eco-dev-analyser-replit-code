@@ -1,0 +1,54 @@
+warning: in the working copy of '.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '.replit', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'ECO_ANALYZER.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'VERCEL_DEPLOYMENT.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/app.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/routes/analyze.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/routes/benchmarks.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/routes/coach.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/routes/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/routes/project.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/routes/report.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/analyzer.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/analyzer.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/benchmarks.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/benchmarks.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/coach.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/eco.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/eco.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/preferences.test.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/preferences.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/api-server/src/services/sandbox.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/ecodev/src/AppReal.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/ecodev/src/DeviceWidget.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'artifacts/mockup-sandbox/src/.generated/mockup-components.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docker-compose.production.yml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/PRODUCTION_SCOPE.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'integrations/desktop-app/README.md', LF will be replaced by CRLF the next time Git touches it
+ .env.example                                       |  27 [32m+[m[31m--[m
+ .replit                                            |   8 [32m+[m[31m-[m
+ ECO_ANALYZER.md                                    |  28 [32m++[m[31m-[m
+ VERCEL_DEPLOYMENT.md                               |  23 [32m++[m[31m-[m
+ artifacts/api-server/src/app.ts                    |  38 [32m+++[m[31m-[m
+ artifacts/api-server/src/routes/analyze.ts         | 113 [32m+++++++[m[31m----[m
+ artifacts/api-server/src/routes/benchmarks.ts      |   9 [32m+[m[31m-[m
+ artifacts/api-server/src/routes/coach.ts           |   4 [32m+[m[31m-[m
+ artifacts/api-server/src/routes/index.ts           |   2 [32m+[m
+ artifacts/api-server/src/routes/project.ts         |  11 [32m+[m[31m-[m
+ artifacts/api-server/src/routes/report.ts          |  30 [32m++[m[31m-[m
+ artifacts/api-server/src/services/analyzer.test.ts |  78 [32m+++++++[m[31m-[m
+ artifacts/api-server/src/services/analyzer.ts      | 109 [32m+++++++[m[31m----[m
+ .../api-server/src/services/benchmarks.test.ts     | 133 [32m++++++++++++[m[31m-[m
+ artifacts/api-server/src/services/benchmarks.ts    |  66 [32m++++[m[31m---[m
+ artifacts/api-server/src/services/coach.ts         |  31 [32m+[m[31m--[m
+ artifacts/api-server/src/services/eco.test.ts      |   9 [32m+[m
+ artifacts/api-server/src/services/eco.ts           |  23 [32m++[m[31m-[m
+ .../api-server/src/services/preferences.test.ts    |  20 [32m++[m
+ artifacts/api-server/src/services/preferences.ts   |  24 [32m++[m[31m-[m
+ artifacts/api-server/src/services/sandbox.ts       | 129 [32m++++++++++[m[31m---[m
+ artifacts/ecodev/src/AppReal.tsx                   |  82 [32m+++++[m[31m---[m
+ artifacts/ecodev/src/DeviceWidget.tsx              |  18 [32m+[m[31m-[m
+ docker-compose.production.yml                      |   3 [31m-[m
+ docs/PRODUCTION_SCOPE.md                           | 208 [32m+++++++++++++++++++++[m
+ integrations/desktop-app/README.md                 |  12 [32m++[m
+ 26 files changed, 996 insertions(+), 242 deletions(-)

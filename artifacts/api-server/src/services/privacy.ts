@@ -1,0 +1,12 @@
+export const privacyMetadata = {
+  classification: "IMPLEMENTATION_FACT",
+  sourceProcessing: "Submitted source is processed by the configured EcoDev API server. The browser sends source to /api/analyze, /api/coach, or /api/project/analyze only when the relevant action is requested. Submitted source is not written to an application database or server-side history by this implementation.",
+  execution: "When execution is requested, source is written to a private temporary sandbox workspace and removed after the run. Static analysis and the local-rules coach process source in the API request.",
+  resultHandling: "Analysis results are returned to the caller. An explicit report download posts the result object to /api/report to generate that download; this implementation does not persist the report object server-side.",
+  browserHistory: "The web app may store up to 12 returned analysis-result objects in this browser under the ecodev-history localStorage key. It does not store the submitted request body as a separate browser history item. Entries remain until they are displaced by the 12-entry limit, cleared with Clear local history, or the browser removes this site's data.",
+  companion: "The optional desktop companion binds to 127.0.0.1 and has no upload client. A browser or desktop shell that requests its local endpoint receives the snapshot.",
+  telemetry: "A normal browser cannot automatically read whole-device telemetry. Modeled energy/carbon are not measurements of whole-laptop electricity.",
+  retention: "This application has no server-side analysis-history or report-retention feature. Temporary sandbox workspaces exist only for a run and are removed afterward. The in-memory rate limiter retains a client IP address and request count only for its configured window (60 seconds by default); it stores no source or result. Deployment infrastructure, reverse proxies, operating-system logs, and an operator's configuration are outside this implementation and may have their own retention policies.",
+  deployment: { localSelfHosted: "With an API you operate locally or on your own infrastructure, source is sent to that configured server.", publicHosted: "With a public hosted API, source is sent to that host; ask its operator about infrastructure logging and retention." },
+  freeToUse: "EcoDev's included analyzer, sandbox workflow, local-rules coach, benchmarks, and Laptop Saver do not require paid API keys, subscriptions, or external AI services.",
+} as const;

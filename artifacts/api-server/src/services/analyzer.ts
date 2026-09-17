@@ -3,9 +3,10 @@ export type SupportedLanguage = "javascript" | "typescript" | "python" | "c" | "
 export type FindingConfidence = "high" | "medium" | "low";
 export type Finding = { severity: "high" | "medium" | "low" | "info"; title: string; detail: string; ruleId?: string; line?: number; column?: number; location?: { line: number; column: number }; evidence?: string; effect?: string; recommendation?: string; confidence?: FindingConfidence; benchmarkRequired?: boolean };
 export type AlternativeTradeoffs = { performance: "better" | "same" | "worse" | "unknown"; memory: "better" | "same" | "worse" | "unknown"; energy: "better" | "same" | "worse" | "unknown" | "potentially-better"; carbon: "better" | "same" | "worse" | "unknown" | "potentially-lower"; security: "high" | "medium" | "low" | "review-required"; reliability: "high" | "medium" | "low"; scalability: "high" | "medium" | "low"; portability: "high" | "medium" | "low"; effort: "low" | "medium" | "high"; functionalRisk: "low" | "medium" | "high" };
-export type Alternative = { id: string; title: string; description: string; complexity: string; expectedRuntimeChange: string; expectedMemoryChange: string; simplicity: string; readability: string; maintainability: string; portability: string; projectedEnergyChange: string; projectedCarbonChange: string; code?: string; tradeoffs?: AlternativeTradeoffs };
+export type Alternative = { id: string; title: string; description: string; complexity: string; expectedRuntimeChange: string; expectedMemoryChange: string; simplicity: string; readability: string; maintainability: string; portability: string; projectedEnergyChange: string; projectedCarbonChange: string; supportedBy?: string; category?: "performance" | "energy-efficiency"; code?: string; tradeoffs?: AlternativeTradeoffs };
 export type StaticStructure = { functions: number; calls: number; loops: number; nestedLoops: number; recursion: number; conditionals: number; allocations: number; ioOperations: number; repeatedWorkSignals: number };
-export type StaticAnalysis = { language: SupportedLanguage; confidence: "high" | "medium" | "low"; lines: number; bytes: number; complexity: { time: string; space: string; basis: string; timeClass?: string; spaceClass?: string }; structure: StaticStructure; score: number; findings: Finding[]; alternatives: Alternative[] };
+export type StaticCapabilities = { membershipScan: "AVAILABLE" | "UNAVAILABLE"; sorting: "AVAILABLE" | "UNAVAILABLE"; allocationPressure: "AVAILABLE" | "UNAVAILABLE" };
+export type StaticAnalysis = { language: SupportedLanguage; confidence: "high" | "medium" | "low"; lines: number; bytes: number; complexity: { time: string; space: string; basis: string; timeClass?: string; spaceClass?: string }; structure: StaticStructure; capabilities: StaticCapabilities; score: number; findings: Finding[]; alternatives: Alternative[] };
 
 const aliases: Record<string, SupportedLanguage> = { js: "javascript", javascript: "javascript", node: "javascript", ts: "typescript", typescript: "typescript", py: "python", python: "python", c: "c", cc: "cpp", cpp: "cpp", "c++": "cpp", go: "go", golang: "go" };
 export function normalizeLanguage(value?: string | null): SupportedLanguage | null { return value ? aliases[value.trim().toLowerCase()] ?? null : null; }
@@ -22,17 +23,59 @@ export function detectLanguage(code: string, hint?: string | null): { language: 
 }
 
 function count(code: string, re: RegExp) { return [...code.matchAll(re)].length; }
-function hasNestedLoops(code: string) { return /\b(for|while|do)\b[\s\S]{0,1200}\b(for|while|do)\b/.test(code); }
+function hasNestedLoops(code: string, language: SupportedLanguage) {
+  if (language === "python") {
+    const stack: number[] = [];
+    for (const line of code.split("\n")) {
+      const match = line.match(/^(\s*)(for|while)\b/);
+      if (!match) continue;
+      const indent = match[1].replace(/\t/g, "    ").length;
+      while (stack.length && stack.at(-1)! >= indent) stack.pop();
+      if (stack.length) return true;
+      stack.push(indent);
+    }
+    return false;
+  }
+  // A same-line loop chain is nested in C-like languages. For blocks, inspect
+  // only to the matching brace so sequential loops do not become false positives.
+  if (/\b(for|while|do)\b[^\n{]{0,360}\)\s*(?:\{\s*)?\b(for|while|do)\b/.test(code)) return true;
+  for (const loop of code.matchAll(/\b(for|while|do)\b/g)) {
+    const open = code.indexOf("{", loop.index);
+    if (open < 0 || open - (loop.index ?? 0) > 600) continue;
+    let depth = 0, close = -1;
+    for (let index = open; index < Math.min(code.length, open + 1600); index += 1) {
+      if (code[index] === "{") depth += 1;
+      if (code[index] === "}" && --depth === 0) { close = index; break; }
+    }
+    if (close > open && /\b(for|while|do)\b/.test(code.slice(open + 1, close))) return true;
+  }
+  return false;
+}
 function lineAt(code: string, index: number) { return code.slice(0, Math.max(0, index)).split("\n").length; }
 
-function structuralMetrics(code: string): StaticStructure {
-  const functions = count(code, /\b(function|def|func)\s+[A-Za-z_]\w*|[A-Za-z_]\w*\s*=>/g);
+function languagePatterns(language: SupportedLanguage) {
+  const common = { loops: /\b(for|while|do)\b/g, conditionals: /\b(if|else\s+if|switch|case|when)\b/g, functions: /\b(function|def|func)\s+[A-Za-z_]\w*|[A-Za-z_]\w*\s*=>/g };
+  if (language === "python") return { ...common, loops: /\b(for|while)\b/g, conditionals: /\b(if|elif|else|match|case)\b/g, functions: /\b(def|class)\s+[A-Za-z_]\w*/g, membership: /\.(count|index)\s*\(/g, sorting: /\b(sorted|list\.sort)\s*\(/g, allocations: /\b(dict|list|set|tuple|bytearray)\s*\(|\[[^\]]*\]|\{[^}]*\}/g, membershipAvailable: true, sortingAvailable: true };
+  if (language === "go") return { ...common, loops: /\bfor\b/g, conditionals: /\b(if|switch|case|select)\b/g, functions: /\bfunc\s+(?:\([^)]*\)\s*)?[A-Za-z_]\w*/g, membership: /\b(?:slices\.Contains|strings\.Contains|maps\.Keys)\s*\(/g, sorting: /\bsort\.(?:Slice|Ints|Strings|Search)\s*\(/g, allocations: /\b(make|new)\s*\(|\[\][A-Za-z_]/g, membershipAvailable: true, sortingAvailable: true };
+  if (language === "cpp") return { ...common, functions: /(?:\b[A-Za-z_]\w*(?:\s*<[^>]+>)?\s+)+[A-Za-z_]\w*\s*\([^;{}]*\)\s*\{/g, membership: /\b(?:std::find|find)\s*\(/g, sorting: /\b(?:std::sort|sort)\s*\(/g, allocations: /\b(new|std::vector|std::string|std::unordered_(?:map|set)|std::map|std::set)\b/g, membershipAvailable: true, sortingAvailable: true };
+  if (language === "c") return { ...common, functions: /\b[A-Za-z_]\w*\s+[*\s]*[A-Za-z_]\w*\s*\([^;{}]*\)\s*\{/g, membership: /$^/g, sorting: /\bqsort\s*\(/g, allocations: /\b(calloc|malloc|realloc)\s*\(/g, membershipAvailable: false, sortingAvailable: true };
+  return { ...common, membership: /\.(includes|indexOf|find|some)\s*\(/g, sorting: /\.sort\s*\(/g, allocations: /\bnew\s+|\b(Array|Object|Map|Set)\s*\(/g, membershipAvailable: true, sortingAvailable: true };
+}
+
+function membershipInsideLoop(code: string, language: SupportedLanguage, membership: RegExp) {
+  if (language === "python") return /\b(for|while)\b[^\n]*:\s*(?:\n[ \t]+[^\n]*){0,12}\b(?:if|while)\b[^\n]*\b[A-Za-z_]\w*\s+in\s+[A-Za-z_]\w*/.test(code) || membership.test(code);
+  return /\b(for|while)\b[\s\S]{0,1500}/.test(code) && membership.test(code);
+}
+
+function structuralMetrics(code: string, language: SupportedLanguage): StaticStructure {
+  const patterns = languagePatterns(language);
+  const functions = count(code, patterns.functions);
   const calls = count(code, /\b[A-Za-z_]\w*\s*\(/g);
-  const loops = count(code, /\b(for|while|do)\b/g);
-  const conditionals = count(code, /\b(if|else\s+if|switch|case|when)\b/g);
+  const loops = count(code, patterns.loops);
+  const conditionals = count(code, patterns.conditionals);
   const ioOperations = count(code, /\b(console\.|print\s*\(|printf\s*\(|fmt\.Print|readFile|writeFile|fetch\s*\(|requests\.|http\.)/g);
-  const repeatedWorkSignals = count(code, /\.(includes|indexOf|find|some|sort)\s*\(|\b(JSON\.(parse|stringify)|parseInt|parseFloat)\s*\(/g);
-  return { functions, calls, loops, nestedLoops: hasNestedLoops(code) ? 1 : 0, recursion: /\b([A-Za-z_]\w*)\s*\([^\n]*\)[\s\S]{0,450}\b\1\s*\(/.test(code) ? 1 : 0, conditionals, allocations: count(code, /\bnew\s+|Array\(|Object\.|Map\(|Set\(|dict\(|list\(|malloc\s*\(/g), ioOperations, repeatedWorkSignals };
+  const repeatedWorkSignals = count(code, patterns.membership) + count(code, patterns.sorting) + count(code, /\b(JSON\.(parse|stringify)|parseInt|parseFloat)\s*\(/g);
+  return { functions, calls, loops, nestedLoops: hasNestedLoops(code, language) ? 1 : 0, recursion: /\b([A-Za-z_]\w*)\s*\([^\n]*\)[\s\S]{0,450}\b\1\s*\(/.test(code) ? 1 : 0, conditionals, allocations: count(code, patterns.allocations), ioOperations, repeatedWorkSignals };
 }
 
 function completeFindings(findings: Finding[]): Finding[] {
@@ -42,9 +85,7 @@ function completeFindings(findings: Finding[]): Finding[] {
     return {
       ...finding,
       ruleId: finding.ruleId ?? `ECO-${stable || "RULE"}-${index + 1}`,
-      line: finding.line ?? 1,
-      column: finding.column ?? 1,
-      location: finding.location ?? { line: finding.line ?? 1, column: finding.column ?? 1 },
+      ...(finding.line != null ? { line: finding.line, column: finding.column ?? 1, location: finding.location ?? { line: finding.line, column: finding.column ?? 1 } } : {}),
       evidence: finding.evidence ?? finding.detail,
       effect: finding.effect ?? (severity === "info" ? "No material hotspot was established by this rule." : "This pattern may increase work, resource use, or engineering risk as the workload grows."),
       recommendation: finding.recommendation ?? finding.detail,
@@ -76,23 +117,24 @@ function suggestionCode(language: SupportedLanguage, id: string) {
 
 export function analyzeCode(code: string, languageHint?: string | null): StaticAnalysis {
   const detected = detectLanguage(code, languageHint), language = detected.language;
+  const patterns = languagePatterns(language);
   const lines = code.split("\n").length, bytes = Buffer.byteLength(code, "utf8");
   const findings: Finding[] = [];
-  const nested = hasNestedLoops(code);
-  const membership = /\b(for|while)\b[\s\S]{0,1500}\.(includes|indexOf|find|some)\s*\(/.test(code);
-  const sort = /\.(sort)\s*\(|\bsorted\s*\(/.test(code);
+  const nested = hasNestedLoops(code, language);
+  const membership = patterns.membershipAvailable && membershipInsideLoop(code, language, patterns.membership);
+  const sort = patterns.sorting.test(code);
   const recursion = /\b([A-Za-z_]\w*)\s*\([^\n]*\)[\s\S]{0,450}\b\1\s*\(/.test(code);
-  const allocations = count(code, /\bnew\s+|Array\(|Object\.|Map\(|Set\(|dict\(|list\(|malloc\s*\(/g);
+  const allocations = count(code, patterns.allocations);
   const trailingControl = /(^|\n)\s*(if|for|while|switch)\s*\([^\n]*\)\s*$/.test(code.trim());
 
-  let time = "O(n) inferred";
-  let space = allocations > 0 ? "O(n) inferred" : "O(1) inferred";
-  const basis = "Static structural inference from the submitted source. It is separate from measured runtime/resource metrics.";
-  if (recursion && /fibonacci|fib/i.test(code)) { time = "O(2^n) inferred"; findings.push({ severity: "high", title: "Explosive recursive growth", detail: "A Fibonacci-like recursive pattern was detected; memoization or iteration can avoid repeated subproblems.", line: lineAt(code, code.search(/fibonacci|fib/i)) }); }
-  else if (nested) { time = "O(n²) inferred"; findings.push({ severity: "high", title: "Nested iteration hotspot", detail: "Nested loops can multiply work as input grows. Consider indexing, hashing, sorting once, or reducing repeated scans." }); }
-  else if (sort) { time = "O(n log n) inferred"; findings.push({ severity: "medium", title: "Full sort detected", detail: "A full collection sort is typically O(n log n). Avoid it when only a small ordered subset is needed." }); }
-  if (membership) { time = nested ? time : "O(n²) inferred"; findings.push({ severity: "high", title: "Repeated linear membership lookup", detail: "includes/indexOf/find/some inside iteration can rescan data. Set/Map/dict indexing can reduce repeated lookup work." }); }
-  if (allocations >= 3) findings.push({ severity: "low", title: "Allocation pressure", detail: "Several allocation-heavy constructs were detected. Benchmark peak memory before trading memory for speed." });
+  let time = "O(n)-like inferred";
+  let space = allocations > 0 ? "O(n)-like inferred" : "O(1)-like inferred";
+  const basis = "INFERRED: source-structure heuristics only. Loop bounds, input distributions, library implementations, and runtime data can change actual complexity.";
+  if (recursion && /fibonacci|fib/i.test(code)) { time = "O(2^n)-like inferred"; findings.push({ severity: "high", title: "Explosive recursive growth", detail: "A Fibonacci-like recursive call pattern was detected. This is a structural inference, not a proof of recurrence behavior.", evidence: "A function-like declaration/call pattern refers to the same name within the inspected source region.", effect: "INFERRED: repeated subproblems can grow rapidly when this recurrence is reached.", recommendation: "Consider memoization or an iterative formulation, then validate representative behavior and benchmark.", confidence: "medium", benchmarkRequired: true, line: lineAt(code, code.search(/fibonacci|fib/i)) }); }
+  else if (nested) { time = "O(n²)-like inferred"; findings.push({ severity: "high", title: "Nested iteration hotspot", detail: "Nested loops were observed in the same structural block; an O(n²)-like upper-bound pattern is inferred from loop structure.", evidence: "Two loop constructs appear in a nested block rather than as separate sequential loops.", effect: "INFERRED: work can multiply as loop inputs grow; bounds may be constant or data-dependent.", recommendation: "Consider indexing, hashing, sorting once, or removing repeated scans; benchmark before adopting a change.", confidence: "medium", benchmarkRequired: true }); }
+  else if (sort) { time = "O(n log n)-like inferred"; findings.push({ severity: "medium", title: "Full sort detected", detail: "A language-recognized full-sort call was observed; common implementations are O(n log n), but library and comparator behavior are runtime-dependent.", evidence: `Recognized ${language} sorting call in submitted source.`, effect: "INFERRED: sorting the entire collection can dominate work when only a subset is needed.", recommendation: "Use a top-k/selection strategy only when the required result permits it; benchmark representative input sizes.", confidence: "medium", benchmarkRequired: true }); }
+  if (membership) { time = nested ? time : "O(n²)-like inferred"; findings.push({ severity: "high", title: "Repeated linear membership lookup", detail: "A language-recognized membership/search operation was observed inside an iteration. It may rescan a collection on each pass.", evidence: `Loop plus ${language} membership/search syntax in the same inspected source region.`, effect: "INFERRED: repeated scans can create an O(n²)-like pattern when collections grow together.", recommendation: "Consider a Set/Map/dict or an indexed lookup when semantics allow; validate behavior and benchmark.", confidence: "medium", benchmarkRequired: true }); }
+  if (allocations >= 3) findings.push({ severity: "low", title: "Allocation pressure", detail: "Several language-recognized allocation constructs were observed. Static source cannot determine object lifetime or actual RSS.", evidence: `${allocations} allocation-like constructs were found in the submitted source.`, effect: "INFERRED: allocation churn may increase memory traffic or garbage-collection work.", recommendation: "Measure maximum RSS with a representative benchmark before trading memory for speed.", confidence: "low", benchmarkRequired: true });
   if (trailingControl) findings.push({ severity: "high", title: "Source appears incomplete", detail: "The file ends with a control statement that has no body. Add the missing block and closing braces before benchmarking runtime or energy." });
   if (!findings.length) findings.push({ severity: "info", title: "No obvious hotspot detected", detail: "Static heuristics found no high-confidence optimization target in this submission." });
 
@@ -100,17 +142,16 @@ export function analyzeCode(code: string, languageHint?: string | null): StaticA
   score = Math.max(10, Math.min(99, score));
   const alternatives: Alternative[] = [];
   if (membership || nested) {
-    alternatives.push({ id: "hash-lookup", title: "Hash-backed lookup", description: "Build a Set/Map/dict-style index once and use average constant-time membership checks.", complexity: "Usually O(n) overall", expectedRuntimeChange: "Potentially much faster when repeated scans dominate; verify with a benchmark.", expectedMemoryChange: "+O(n) auxiliary state", simplicity: "Medium", readability: "High", maintainability: "High", portability: "High", projectedEnergyChange: "Projected lower energy per run when CPU time falls.", projectedCarbonChange: "Projected lower emissions per run; modelled, not directly measured.", code: language === "javascript" || language === "typescript" ? uniqueItemsAlternative(code) ?? suggestionCode(language, "hash-lookup") : suggestionCode(language, "hash-lookup") });
-    alternatives.push({ id: "sort-once", title: "Sort once, then scan", description: "Sort once when ordering is useful, then perform a linear pass instead of repeated membership scans.", complexity: "O(n log n)", expectedRuntimeChange: "Often better than O(n²) scans for large inputs.", expectedMemoryChange: "Low to moderate", simplicity: "Medium", readability: "Medium", maintainability: "High", portability: "Very high", projectedEnergyChange: "Potentially lower energy than quadratic scans; workload-dependent.", projectedCarbonChange: "Potentially lower emissions after measured runtime improvement.", code: suggestionCode(language, "sort-once") });
-    alternatives.push({ id: "streaming", title: "Streaming / one-pass state", description: "Keep only the minimum state required and process the input once, reducing unnecessary allocations and passes.", complexity: "Often O(n)", expectedRuntimeChange: "Potentially lower constant factors and memory traffic.", expectedMemoryChange: "Can reduce peak memory substantially", simplicity: "Medium", readability: "High", maintainability: "Medium", portability: "High", projectedEnergyChange: "Potentially lower memory-movement and CPU energy.", projectedCarbonChange: "Projected lower emissions when resource use falls.", code: suggestionCode(language, "streaming") });
+    const supportedBy = membership ? "Repeated linear membership lookup" : "Nested iteration hotspot";
+    alternatives.push({ id: "hash-lookup", title: "Hash-backed lookup", description: "Build a Set/Map/dict-style index once and use average constant-time membership checks.", complexity: "Usually O(n) overall", expectedRuntimeChange: "Potentially much faster when repeated scans dominate; verify with a benchmark.", expectedMemoryChange: "+O(n) auxiliary state", simplicity: "Medium", readability: "High", maintainability: "High", portability: "High", projectedEnergyChange: "Projected lower energy per run when CPU time falls.", projectedCarbonChange: "Projected lower emissions per run; modelled, not directly measured.", supportedBy, category: "performance", code: language === "javascript" || language === "typescript" ? uniqueItemsAlternative(code) ?? suggestionCode(language, "hash-lookup") : suggestionCode(language, "hash-lookup") });
+    alternatives.push({ id: "sort-once", title: "Sort once, then scan", description: "Sort once when ordering is useful, then perform a linear pass instead of repeated membership scans.", complexity: "O(n log n)", expectedRuntimeChange: "Often better than O(n²) scans for large inputs.", expectedMemoryChange: "Low to moderate", simplicity: "Medium", readability: "Medium", maintainability: "High", portability: "Very high", projectedEnergyChange: "Potentially lower energy than quadratic scans; workload-dependent.", projectedCarbonChange: "Potentially lower emissions after measured runtime improvement.", supportedBy, category: "performance", code: suggestionCode(language, "sort-once") });
+    alternatives.push({ id: "streaming", title: "Streaming / one-pass state", description: "Keep only the minimum state required and process the input once, reducing unnecessary allocations and passes.", complexity: "Often O(n)", expectedRuntimeChange: "Potentially lower constant factors and memory traffic.", expectedMemoryChange: "Can reduce peak memory substantially", simplicity: "Medium", readability: "High", maintainability: "Medium", portability: "High", projectedEnergyChange: "Potentially lower memory-movement and CPU energy.", projectedCarbonChange: "Projected lower emissions when resource use falls.", supportedBy, category: "energy-efficiency", code: suggestionCode(language, "streaming") });
   } else if (sort) {
-    alternatives.push({ id: "top-k", title: "Avoid a full sort for top-k", description: "Use a heap or selection strategy when only the best k records are required.", complexity: "Often O(n log k)", expectedRuntimeChange: "Can materially reduce work when k << n.", expectedMemoryChange: "O(k)", simplicity: "Medium", readability: "Medium", maintainability: "Medium", portability: "High", projectedEnergyChange: "Projected lower energy by avoiding a full sort.", projectedCarbonChange: "Projected lower carbon when measured runtime decreases.", code: suggestionCode(language, "top-k") });
-    alternatives.push({ id: "chunked", title: "Chunked processing", description: "Process bounded batches and release intermediate data promptly.", complexity: "Batch-bounded work", expectedRuntimeChange: "May trade coordination overhead for stable memory.", expectedMemoryChange: "Lower peak memory", simplicity: "Medium", readability: "Medium", maintainability: "High", portability: "High", projectedEnergyChange: "Potentially lower memory-related energy at scale.", projectedCarbonChange: "Projected reduction depends on the measured resource profile.", code: suggestionCode(language, "batch-work") });
-  } else {
-    alternatives.push({ id: "hot-path", title: "Tune the measured hot path", description: "Keep the algorithm, but remove unnecessary allocation, conversion, and repeated work around the measured hotspot.", complexity: time, expectedRuntimeChange: "Workload-dependent", expectedMemoryChange: "Neutral to slightly lower", simplicity: "High", readability: "High", maintainability: "Very high", portability: "Very high", projectedEnergyChange: "Usually a modest improvement unless the hotspot is allocation-heavy.", projectedCarbonChange: "Projected modest reduction; verify with a before/after run." });
-    alternatives.push({ id: "batch-work", title: "Batch repeated work", description: "Move invariant work out of loops and combine repeated I/O or serialization operations.", complexity: time, expectedRuntimeChange: "Potentially lower constant factors", expectedMemoryChange: "Low to moderate", simplicity: "High", readability: "High", maintainability: "High", portability: "Very high", projectedEnergyChange: "Potentially lower CPU energy through less repeated work.", projectedCarbonChange: "Projected lower emissions when runtime falls.", code: suggestionCode(language, "batch-work") });
+    alternatives.push({ id: "top-k", title: "Avoid a full sort for top-k", description: "Use a heap or selection strategy when only the best k records are required.", complexity: "Often O(n log k)", expectedRuntimeChange: "Can materially reduce work when k << n.", expectedMemoryChange: "O(k)", simplicity: "Medium", readability: "Medium", maintainability: "Medium", portability: "High", projectedEnergyChange: "Projected lower energy by avoiding a full sort.", projectedCarbonChange: "Projected lower carbon when measured runtime decreases.", supportedBy: "Full sort detected", category: "performance", code: suggestionCode(language, "top-k") });
+    alternatives.push({ id: "chunked", title: "Chunked processing", description: "Process bounded batches and release intermediate data promptly.", complexity: "Batch-bounded work", expectedRuntimeChange: "May trade coordination overhead for stable memory.", expectedMemoryChange: "Lower peak memory", simplicity: "Medium", readability: "Medium", maintainability: "High", portability: "High", projectedEnergyChange: "Potentially lower memory-related energy at scale.", projectedCarbonChange: "Projected reduction depends on the measured resource profile.", supportedBy: "Full sort detected", category: "energy-efficiency", code: suggestionCode(language, "batch-work") });
   }
-  const structure = structuralMetrics(code);
+  const structure = structuralMetrics(code, language);
+  const capabilities: StaticCapabilities = { membershipScan: patterns.membershipAvailable ? "AVAILABLE" : "UNAVAILABLE", sorting: patterns.sortingAvailable ? "AVAILABLE" : "UNAVAILABLE", allocationPressure: "AVAILABLE" };
   const completeAlternatives = alternatives.map((alternative): Alternative => ({
     ...alternative,
     tradeoffs: alternative.tradeoffs ?? {
@@ -121,5 +162,5 @@ export function analyzeCode(code: string, languageHint?: string | null): StaticA
       security: "review-required", reliability: "medium", scalability: /large|scale|o\(n\)|stream|batch/i.test(`${alternative.title} ${alternative.description}`) ? "high" : "medium", portability: /very high|high/i.test(alternative.portability) ? "high" : "medium", effort: /simple|low/i.test(alternative.simplicity) ? "low" : "medium", functionalRisk: "medium",
     },
   }));
-  return { language, confidence: detected.confidence, lines, bytes, complexity: { time, space, basis, timeClass: time.replace(/ inferred$/, ""), spaceClass: space.replace(/ inferred$/, "") }, structure, score, findings: completeFindings(findings), alternatives: completeAlternatives };
+  return { language, confidence: detected.confidence, lines, bytes, complexity: { time, space, basis, timeClass: time.replace(/ inferred$/, ""), spaceClass: space.replace(/ inferred$/, "") }, structure, capabilities, score, findings: completeFindings(findings), alternatives: completeAlternatives };
 }

@@ -21,31 +21,8 @@ function localCoach(input: CoachInput) {
 }
 
 export async function coachCode(input: CoachInput) {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return localCoach(input);
-  const model = process.env.ECODEV_AI_MODEL || "gpt-5.6-luna";
-  const prompt = [
-    "You are EcoDev's senior software-performance and green-computing coach.",
-    "Analyze the supplied code and evidence. Do not invent benchmark results. Clearly separate measured facts from hypotheses.",
-    "Return JSON with keys summary, recommendations (array of strings), nextTests (array of strings), risks (array of strings).",
-    `Language: ${input.language}`,
-    `User instruction: ${input.instruction ?? "none"}`,
-    `Static analysis: ${JSON.stringify(input.analysis)}`,
-    `Security analysis: ${JSON.stringify(input.security)}`,
-    `Source code:\n${input.code.slice(0, 120000)}`,
-  ].join("\n\n");
-  try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, input: prompt, max_output_tokens: 1200 }),
-    });
-    if (!response.ok) throw new Error(`OpenAI coach request failed with ${response.status}`);
-    const data = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
-    const text = data.output_text ?? data.output?.flatMap((item) => item.content ?? []).map((item) => item.text ?? "").join("") ?? "";
-    const parsed = JSON.parse(text) as { summary?: string; recommendations?: string[]; nextTests?: string[]; risks?: string[] };
-    return { provider: model, summary: parsed.summary ?? "No summary returned.", recommendations: parsed.recommendations ?? [], nextTests: parsed.nextTests ?? [], risks: parsed.risks ?? [], instruction: input.instruction ?? null };
-  } catch {
-    return { ...localCoach(input), provider: "local-rules-fallback" };
-  }
+  // The coach is deliberately local and rule-backed. It receives the source
+  // only in this configured EcoDev API process and never forwards it to an AI
+  // provider, regardless of environment variables.
+  return localCoach(input);
 }

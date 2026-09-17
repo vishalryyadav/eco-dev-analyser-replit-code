@@ -1,7 +1,7 @@
 export type EcoExecution = { cpuTimeMs: number | null; wallTimeMs: number | null; measured: boolean };
-export type EcoOptions = { region?: string; gridFactorGPerKwh?: number; gridSource?: string; gridYear?: string | number; functionalUnit?: string; functionalUnitCount?: number; embodiedEmissionsGrams?: number };
+export type EcoOptions = { region?: string; gridFactorGPerKwh?: number; gridSource?: string; gridYear?: string | number; functionalUnit?: string; functionalUnitCount?: number; embodiedEmissionsGrams?: number; embodiedEmissionsSource?: string };
 export type GridFactor = { region: string; factorGPerKwh: number; unit: "gCO2e/kWh"; source: string; year: string; retrievalDate: string; provenance: "RESEARCH REFERENCE" | "CONFIGURED" };
-export type SCIReport = { label: "SCI-style operational estimate"; formula: "(E × I + M) / R"; functionalUnit: string; functionalUnitCount: number; energyKwh: number | null; operationalCarbonGrams: number | null; embodiedEmissionsGrams: number; scoreGramsPerUnit: number | null; method: string; confidence: "High" | "Medium" | "Low" | "Research Reference" };
+export type SCIReport = { label: "SCI-style operational estimate"; formula: "(E × I + M) / R"; functionalUnit: string; functionalUnitCount: number; energyKwh: number | null; operationalCarbonGrams: number | null; embodiedEmissionsGrams: number | null; embodiedEmissionsSource: string | null; embodiedEmissionsClassification: "MODELED / ESTIMATED" | "UNAVAILABLE"; scoreGramsPerUnit: number | null; method: string; confidence: "High" | "Medium" | "Low" | "Research Reference" };
 
 export type ImpactProjection = {
   usage: { runsPerDay: number; daysPerMonth: number; daysPerYear: number };
@@ -58,11 +58,18 @@ function gridFactor(options: EcoOptions): GridFactor {
 function sciReport(energyWh: number | null, grid: GridFactor, options: EcoOptions): SCIReport {
   const functionalUnit = String(options.functionalUnit ?? process.env.ECODEV_FUNCTIONAL_UNIT ?? "execution");
   const functionalUnitCount = Math.max(1e-9, Number(options.functionalUnitCount ?? process.env.ECODEV_FUNCTIONAL_UNIT_COUNT ?? 1) || 1);
-  const embodiedEmissionsGrams = Math.max(0, Number(options.embodiedEmissionsGrams ?? process.env.ECODEV_EMBODIED_EMISSIONS_G ?? 0) || 0);
-  const energyKwh = energyWh == null ? null : round(energyWh / 1000);
-  const operationalCarbonGrams = energyKwh == null ? null : round(energyKwh * grid.factorGPerKwh);
-  const scoreGramsPerUnit = operationalCarbonGrams == null ? null : round((operationalCarbonGrams + embodiedEmissionsGrams) / functionalUnitCount);
-  return { label: "SCI-style operational estimate", formula: "(E × I + M) / R", functionalUnit, functionalUnitCount, energyKwh, operationalCarbonGrams, embodiedEmissionsGrams, scoreGramsPerUnit, method: embodiedEmissionsGrams > 0 ? "Operational energy/carbon plus user-configured embodied emissions divided by the selected functional unit." : "Operational estimate only; embodied emissions were not included.", confidence: energyWh == null ? "Low" : grid.provenance === "RESEARCH REFERENCE" ? "Research Reference" : "Medium" };
+  const configuredEmbodied = Math.max(0, Number(options.embodiedEmissionsGrams ?? process.env.ECODEV_EMBODIED_EMISSIONS_G ?? 0) || 0);
+  const configuredSource = String(options.embodiedEmissionsSource ?? process.env.ECODEV_EMBODIED_EMISSIONS_SOURCE ?? "").trim();
+  const hasDocumentedEmbodied = configuredEmbodied > 0 && configuredSource.length > 0;
+  const embodiedEmissionsGrams = hasDocumentedEmbodied ? configuredEmbodied : null;
+  // SCI values can be several orders of magnitude smaller than Wh. Keep enough
+  // precision to make E exactly traceable to the exported Wh midpoint instead
+  // of rounding a non-zero modeled result into a misleading different value.
+  const sciRound = (value: number) => Number(value.toPrecision(12));
+  const energyKwh = energyWh == null ? null : sciRound(energyWh / 1000);
+  const operationalCarbonGrams = energyKwh == null ? null : sciRound(energyKwh * grid.factorGPerKwh);
+  const scoreGramsPerUnit = operationalCarbonGrams == null ? null : sciRound((operationalCarbonGrams + (embodiedEmissionsGrams ?? 0)) / functionalUnitCount);
+  return { label: "SCI-style operational estimate", formula: "(E × I + M) / R", functionalUnit, functionalUnitCount, energyKwh, operationalCarbonGrams, embodiedEmissionsGrams, embodiedEmissionsSource: hasDocumentedEmbodied ? configuredSource : null, embodiedEmissionsClassification: hasDocumentedEmbodied ? "MODELED / ESTIMATED" : "UNAVAILABLE", scoreGramsPerUnit, method: hasDocumentedEmbodied ? "Operational energy/carbon plus configured embodied-emissions allocation divided by the selected functional unit." : "Operational estimate only; embodied emissions are unavailable because no documented allocation/data source was configured.", confidence: energyWh == null ? "Low" : grid.provenance === "RESEARCH REFERENCE" ? "Research Reference" : "Medium" };
 }
 
 function envNumber(name: string, fallback: number) {

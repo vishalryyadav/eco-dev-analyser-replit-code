@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { analyzeProject, type ProjectFile } from "../services/project";
+import { normalizeLanguage } from "../services/analyzer";
 
 const router = Router();
 const MAX_FILES = 200;
@@ -13,14 +14,16 @@ router.post("/project/analyze", (req, res) => {
   let total = 0;
   const files: ProjectFile[] = [];
   for (const raw of body.files) {
-    if (!raw || typeof raw !== "object") continue;
+    if (!raw || typeof raw !== "object") return res.status(400).json({ error: "Each project file must be an object" });
     const file = raw as { path?: unknown; code?: unknown; language?: unknown };
-    if (typeof file.path !== "string" || typeof file.code !== "string") continue;
+    if (typeof file.path !== "string" || !file.path.trim() || file.path.length > 240 || typeof file.code !== "string") return res.status(400).json({ error: "Each project file requires a non-empty path up to 240 characters and string code" });
+    if (file.language != null && typeof file.language !== "string") return res.status(400).json({ error: "Project file language must be a string when provided" });
+    if (typeof file.language === "string" && !normalizeLanguage(file.language)) return res.status(400).json({ error: "Project file language is unsupported" });
     const bytes = Buffer.byteLength(file.code, "utf8");
-    if (bytes > MAX_FILE_BYTES) continue;
+    if (bytes > MAX_FILE_BYTES) return res.status(413).json({ error: `project files are limited to ${MAX_FILE_BYTES} bytes each` });
     total += bytes;
     if (total > MAX_TOTAL_BYTES) return res.status(413).json({ error: `project source exceeds the ${MAX_TOTAL_BYTES} byte total limit` });
-    files.push({ path: file.path.replaceAll("\\", "/"), code: file.code, language: typeof file.language === "string" ? file.language : null });
+    files.push({ path: file.path.replaceAll("\\", "/"), code: file.code, language: file.language ?? null });
   }
   if (!files.length) return res.status(400).json({ error: "No supported text source files were supplied" });
   return res.json({ ok: true, report: analyzeProject(files) });

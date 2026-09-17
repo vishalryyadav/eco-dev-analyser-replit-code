@@ -33,17 +33,23 @@ export default function DeviceWidget() {
     return () => { mounted = false; window.clearInterval(timer); };
   }, []);
 
+  // Device telemetry is an opt-in enhancement. Do not put an optional
+  // companion in the normal browser workflow: the Laptop Saver page already
+  // provides its core practical guidance without it.
+  if (!AGENT) return null;
+
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[300px] text-xs">
-      <button onClick={() => setOpen(v => !v)} className="w-full rounded-xl border border-[#3b5b42] bg-[#102318]/95 px-4 py-3 text-left shadow-2xl backdrop-blur">
-        <div className="flex items-center justify-between"><span className="font-bold text-[#e7f0d6]">Laptop green monitor</span><span className={data ? "text-[#c6ed51]" : "text-[#91a994]"}>{data ? "Connected" : "Optional"}</span></div>
-        {data && <div className="mt-2 flex flex-wrap gap-3 text-[#a9bea9]"><span>RAM {data.memoryUsedPercent.toFixed(0)}%</span><span>Load {data.loadAverage[0]?.toFixed(1) ?? "-"}</span>{data.batteryPercent != null && <span>Battery {data.batteryPercent}%</span>}{data.energy?.estimatedWatts != null && <span>{data.energy.estimatedWatts.toFixed(1)} W</span>}</div>}
+      <button aria-expanded={open} onClick={() => setOpen(v => !v)} className="w-full rounded-xl border border-[#3b5b42] bg-[#102318]/95 px-4 py-3 text-left shadow-2xl backdrop-blur">
+        <div className="flex items-center justify-between"><span className="font-bold text-[#e7f0d6]">Optional device telemetry</span><span className={data ? "text-[#c6ed51]" : "text-[#f1ce7a]"}>{data ? "LOCAL AGENT" : "OPTIONAL"}</span></div>
+        <p className="mt-1 text-[10px] text-[#91a994]">{data ? "Local device context; never a whole-laptop power claim." : "The Laptop Saver guidance works without this optional local enhancement."}</p>
+        {data && <div className="mt-2 flex flex-wrap gap-3 text-[#a9bea9]"><span>RAM {data.memoryUsedPercent.toFixed(0)}% · MEASURED</span><span>Load {data.loadAverage[0]?.toFixed(1) ?? "UNAVAILABLE"} · MEASURED</span>{data.batteryPercent != null && <span>Battery {data.batteryPercent}% · MEASURED</span>}{data.energy?.estimatedWatts != null && <span>Package {data.energy.estimatedWatts.toFixed(1)} W · MEASURED</span>}</div>}
       </button>
       {open && <div className="mt-2 rounded-xl border border-[#3b5b42] bg-[#102318] p-4 shadow-2xl">
-        {!data ? <p className="text-[#a9bea9]">Install/start the EcoDev desktop companion to enable device-wide recommendations. The website itself does not access OS processes.</p> : <>
-          <div className="mb-2 font-bold">Recommendations</div>
+        {!data ? <><p className="font-bold text-[#e7f0d6]">Local companion not connected</p><p className="mt-2 leading-5 text-[#a9bea9]">To add opt-in device context, install and start the EcoDev desktop companion, then configure this web build with <code>VITE_ECODEV_DEVICE_AGENT_URL</code> pointing to its local <code>/v1/device</code> endpoint.</p><p className="mt-2 leading-5 text-[#718b78]">This does not affect the Analyzer or the practical Laptop Saver guidance. Runtime metrics remain separate, and energy/carbon remain modeled from valid execution duration.</p></> : <>
+          <div className="mb-2 font-bold">Actionable local recommendations</div>
           <div className="space-y-2 text-[#a9bea9]">{data.recommendations.slice(0, 4).map((r, i) => <div key={i}>{r}</div>)}</div>
-          <p className="mt-3 text-[10px] leading-4 text-[#718b78]">Device readings stay on this machine. Power is direct RAPL telemetry only when the operating system exposes it.</p>
+          <div className="mt-3 space-y-1 border-t border-[#31513b] pt-3 text-[10px] leading-4 text-[#718b78]"><p>Battery, memory, load, and process context: MEASURED locally by the companion when the operating system exposes them.</p><p>CPU package energy: {data.energy.available ? `MEASURED via ${data.energy.source}; it excludes display, storage, battery charging, and other whole-laptop loads.` : `UNAVAILABLE (${data.energy.source}).`}</p><p>Device readings stay on this machine and are not uploaded by this widget.</p></div>
         </>}
       </div>}
     </div>

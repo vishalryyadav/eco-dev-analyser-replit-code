@@ -1,4 +1,21 @@
-# Vercel deployment
+# Web deployment and sandbox execution
+
+## Choose the correct deployment mode
+
+This document describes an optional web/API deployment shape; it is **not** a
+permanent-free-hosting guarantee. For a free, time-limited college demonstration,
+use the native Ubuntu WSL2 server plus the Cloudflare Quick Tunnel procedure in
+[`docs/PRODUCTION_SCOPE.md`](docs/PRODUCTION_SCOPE.md). That tunnel is
+testing-only and must not be described as permanent production hosting.
+
+- **Local development:** Vite or the local API for editing and testing.
+- **Local/self-hosted evaluation:** the same-origin Linux/WSL server with a
+  validated Bubblewrap runtime.
+- **Temporary public demonstration:** the documented Quick Tunnel only after the
+  local browser workflow succeeds.
+- **Permanent public service:** requires an operator-owned HTTPS deployment,
+  isolated execution infrastructure, monitoring, abuse controls, and a published
+  retention policy. EcoDev does not provide those external operational controls.
 
 ## Prerequisites
 
@@ -31,7 +48,7 @@ pnpm --filter @workspace/ecodev build
 
 The output is written to `artifacts/ecodev/dist`.
 
-## Vercel web deployment
+## Optional Vercel web/API deployment
 
 Connect the GitHub repository to Vercel and keep the project root at the repository root. The root `vercel.json` installs the monorepo dependencies, builds the Vite web client, serves `artifacts/ecodev/dist`, and exposes the API through `api/index.ts`.
 
@@ -45,7 +62,7 @@ No Replit-only `PORT` or `BASE_PATH` environment variables are required for the 
 
 ### Important execution limitation
 
-Vercel can host the frontend and API routes, but its serverless runtime is not the secure execution worker. The `/api/analyze` endpoint will provide static analysis and will truthfully return `sandbox_unavailable` unless the deployment supplies Bubblewrap or Firejail with permitted Linux user namespaces. Do not add an unsandboxed fallback.
+Vercel can host the frontend and API routes, but its serverless runtime is not the secure execution worker. The `/api/analyze` endpoint will provide static analysis and will truthfully return `sandbox_unavailable` unless the deployment supplies Bubblewrap or Firejail with permitted Linux user namespaces. Do not add an unsandboxed fallback. It is not the project’s validated temporary free public-demo mechanism.
 
 For real compiler/runtime measurements, deploy the Linux image in `deploy/Dockerfile.sandbox` to a Linux container host. The image includes Bubblewrap, GCC, G++, Go, Python, GNU `time`, the API, and the built frontend.
 

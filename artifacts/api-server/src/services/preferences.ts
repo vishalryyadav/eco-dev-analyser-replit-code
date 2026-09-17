@@ -42,13 +42,31 @@ export function normalizePriorityWeights(value: unknown, profile: OptimizationPr
   };
 }
 
-export function rankAlternatives<T extends { id: string }>(alternatives: T[], profile: OptimizationProfile, customWeights?: unknown) {
+function goalEvidence(instruction: unknown) {
+  const goal = typeof instruction === "string" ? instruction.toLowerCase() : "";
+  return {
+    runtime: /runtime|fast|performance|latency|speed/.test(goal),
+    memory: /memory|space|heap|allocation/.test(goal),
+    energy: /energy|green|power|efficient/.test(goal),
+    carbon: /carbon|emission|climate|green/.test(goal),
+    readable: /readab|clarity|simple/.test(goal),
+    maintain: /maintain|maintenance|readab|simple/.test(goal),
+    secure: /secur|safe|risk/.test(goal),
+    reliable: /reliab|correct|determin|test/.test(goal),
+    scalable: /scal|throughput|large/.test(goal),
+    portable: /portab|cross-platform|compatib/.test(goal),
+  };
+}
+
+export function rankAlternatives<T extends { id: string }>(alternatives: T[], profile: OptimizationProfile, customWeights?: unknown, instruction?: unknown) {
   const w = normalizePriorityWeights(customWeights, profile);
+  const goal = goalEvidence(instruction);
   return alternatives.map((alternative, index) => {
     const e = evidence(alternative);
     const score = Object.entries(e).reduce((sum, [key, value]) => sum + value * (w[key as keyof PriorityWeights] ?? 0), 0);
-    return { alternative, index, score };
-  }).sort((a, b) => b.score - a.score || a.index - b.index).map(({ alternative }) => alternative);
+    const goalMatches = Object.entries(e).reduce((sum, [key, value]) => sum + (value && goal[key as keyof PriorityWeights] ? 1 : 0), 0);
+    return { alternative, index, score, goalMatches };
+  }).sort((a, b) => b.score - a.score || b.goalMatches - a.goalMatches || a.index - b.index).map(({ alternative }) => alternative);
 }
 
 export function normalizeProfile(value: unknown): OptimizationProfile {
